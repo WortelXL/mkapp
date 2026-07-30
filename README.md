@@ -5,13 +5,56 @@ met een uniek meld-ID per melding, koppeling van protocollen aan meldingen,
 en een beheerpaneel voor het aanmaken/verwijderen van categorieen en het
 beheren van protocollen.
 
-## Vereisten
+## Snel starten met Docker
+
+De eenvoudigste manier om het systeem te proberen of te draaien is met Docker
+Compose — dit start zowel de applicatie als een MariaDB-database, en
+importeert automatisch het schema uit `database.sql`.
+
+```bash
+docker compose up -d --build
+```
+
+Ga daarna naar **http://localhost:8080**. Zolang er nog geen gebruiker
+bestaat, kom je automatisch op de setup-pagina terecht om het eerste
+beheerdersaccount aan te maken.
+
+**Instellingen aanpassen** doe je in `docker-compose.yml`, onder
+`environment:` bij de `app`-service (databasegegevens, evenementnaam,
+startdatum, aantal dagen) en bij de `db`-service (wachtwoorden). Wijzig in
+elk geval de wachtwoorden voordat je dit ergens publiek draait. Na een
+wijziging herstart je met:
+
+```bash
+docker compose up -d --build
+```
+
+**Gegevens blijven bewaard** in een Docker-volume (`meldkamer_db_data`),
+ook als je de containers stopt of herbouwt. Wil je helemaal opnieuw
+beginnen (let op: dit verwijdert alle meldingen en gebruikers)?
+
+```bash
+docker compose down -v
+```
+
+**Logs bekijken:**
+```bash
+docker compose logs -f app
+```
+
+Wil je de applicatie liever rechtstreeks op een server draaien zonder
+Docker (bijvoorbeeld met een externe/gehoste database)? Volg dan de
+handmatige installatie hieronder.
+
+## Handmatige installatie (zonder Docker)
+
+### Vereisten
 
 - PHP 8.0 of hoger, met de `pdo_mysql` extensie
 - Een MySQL of MariaDB database (mag extern gehost zijn)
 - Een webserver (Apache/Nginx) of `php -S` voor lokaal testen
 
-## Installatie
+### Stappen
 
 1. **Database aanmaken.** Importeer `database.sql` in je (externe) database, bijvoorbeeld:
    ```

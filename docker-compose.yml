@@ -1,0 +1,43 @@
+services:
+  app:
+    build: .
+    container_name: meldkamer_app
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: meldkamer
+      DB_USER: meldkamer_user
+      DB_PASS: wijzig_dit_wachtwoord
+      EVENT_NAAM: "Evenement 2026"
+      EVENT_START_DATUM: "2026-08-14"
+      EVENT_AANTAL_DAGEN: "3"
+      APP_TIMEZONE: "Europe/Amsterdam"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11
+    container_name: meldkamer_db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: wijzig_dit_root_wachtwoord
+      MARIADB_DATABASE: meldkamer
+      MARIADB_USER: meldkamer_user
+      MARIADB_PASSWORD: wijzig_dit_wachtwoord
+    volumes:
+      - meldkamer_db_data:/var/lib/mysql
+      # Wordt automatisch en eenmalig geimporteerd bij de eerste start
+      # (alleen als de database nog helemaal leeg is)
+      - ./database.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  meldkamer_db_data:
