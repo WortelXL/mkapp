@@ -12,6 +12,16 @@ CREATE TABLE IF NOT EXISTS categorieen (
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS gebruikers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    gebruikersnaam VARCHAR(50) NOT NULL UNIQUE,
+    wachtwoord_hash VARCHAR(255) NOT NULL,
+    naam VARCHAR(100) NOT NULL,
+    rol ENUM('beheerder','medewerker') NOT NULL DEFAULT 'medewerker',
+    actief TINYINT(1) NOT NULL DEFAULT 1,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS protocollen (
     id INT AUTO_INCREMENT PRIMARY KEY,
     titel VARCHAR(150) NOT NULL,
@@ -60,16 +70,6 @@ CREATE TABLE IF NOT EXISTS melding_notities (
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
     FOREIGN KEY (gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS gebruikers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    gebruikersnaam VARCHAR(50) NOT NULL UNIQUE,
-    wachtwoord_hash VARCHAR(255) NOT NULL,
-    naam VARCHAR(100) NOT NULL,
-    rol ENUM('beheerder','medewerker') NOT NULL DEFAULT 'medewerker',
-    actief TINYINT(1) NOT NULL DEFAULT 1,
-    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Enkele voorbeeldcategorieen (mag je aanpassen/verwijderen via het beheerpaneel)
