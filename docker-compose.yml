@@ -8,8 +8,8 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "3306"
-      DB_NAME: meldkamer
-      DB_USER: meldkamer_user
+      DB_NAME: mpapp
+      DB_USER: phpserver
       DB_PASS: wijzig_dit_wachtwoord
       EVENT_NAAM: "Evenement 2026"
       EVENT_START_DATUM: "2026-08-14"
@@ -25,8 +25,8 @@ services:
     restart: unless-stopped
     environment:
       MARIADB_ROOT_PASSWORD: wijzig_dit_root_wachtwoord
-      MARIADB_DATABASE: meldkamer
-      MARIADB_USER: meldkamer_user
+      MARIADB_DATABASE: mkapp
+      MARIADB_USER: phpserver
       MARIADB_PASSWORD: wijzig_dit_wachtwoord
     volumes:
       - meldkamer_db_data:/var/lib/mysql
