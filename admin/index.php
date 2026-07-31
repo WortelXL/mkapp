@@ -3,7 +3,7 @@ require_once __DIR__ . '/../includes/functions.php';
 vereis_beheerder();
 $pdo = get_pdo();
 
-$aantal_categorieen = (int) $pdo->query('SELECT COUNT(*) FROM categorieen')->fetchColumn();
+$aantal_hoofdclassificaties = (int) $pdo->query('SELECT COUNT(*) FROM hoofdclassificaties')->fetchColumn();
 $aantal_protocollen = (int) $pdo->query('SELECT COUNT(*) FROM protocollen')->fetchColumn();
 $aantal_meldingen    = (int) $pdo->query('SELECT COUNT(*) FROM meldingen')->fetchColumn();
 $aantal_gebruikers   = (int) $pdo->query('SELECT COUNT(*) FROM gebruikers')->fetchColumn();
@@ -17,7 +17,7 @@ include __DIR__ . '/../includes/header.php';
     <div>
         <p class="eyebrow">Beheer</p>
         <h1>Welkom, <?= e(huidige_gebruiker_naam()) ?></h1>
-        <p>Beheer gebruikers, categorieen en protocollen voor de meldkamer.</p>
+        <p>Beheer gebruikers, classificaties en protocollen voor de meldkamer.</p>
     </div>
 </div>
 
@@ -31,8 +31,8 @@ include __DIR__ . '/../includes/header.php';
         <div class="lbl">Gebruikers</div>
     </div>
     <div class="board-cell">
-        <div class="num c-muted"><?= $aantal_categorieen ?></div>
-        <div class="lbl">Categorieen</div>
+        <div class="num c-muted"><?= $aantal_hoofdclassificaties ?></div>
+        <div class="lbl">Hoofdclassificaties</div>
     </div>
     <div class="board-cell">
         <div class="num c-muted"><?= $aantal_protocollen ?></div>
@@ -47,9 +47,9 @@ include __DIR__ . '/../includes/header.php';
         <a href="/admin/gebruikers.php" class="btn btn-primary">Gebruikers beheren</a>
     </div>
     <div class="panel">
-        <h2>Categorieen</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Maak meldingscategorieen aan (bv. Medisch, Beveiliging) of verwijder ze.</p>
-        <a href="/admin/categorieen.php" class="btn btn-primary">Categorieen beheren</a>
+        <h2>Classificaties</h2>
+        <p style="color:var(--muted); margin-top:-8px;">Beheer hoofd- en subclassificaties waarmee meldingen ingedeeld worden.</p>
+        <a href="/admin/classificaties.php" class="btn btn-primary">Classificaties beheren</a>
     </div>
     <div class="panel">
         <h2>Protocollen</h2>

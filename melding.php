@@ -5,10 +5,11 @@ $pdo = get_pdo();
 
 $id = (int) ($_GET['id'] ?? 0);
 $melding_stmt = $pdo->prepare(
-    'SELECT m.*, c.naam AS categorie_naam, c.kleur AS categorie_kleur,
+    'SELECT m.*, h.naam AS hoofd_naam, h.kleur AS hoofd_kleur, s.naam AS sub_naam,
             g1.naam AS aangemaakt_door_naam, g2.naam AS bijgewerkt_door_naam
      FROM meldingen m
-     LEFT JOIN categorieen c ON c.id = m.categorie_id
+     LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
+     LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
      LEFT JOIN gebruikers g1 ON g1.id = m.aangemaakt_door_id
      LEFT JOIN gebruikers g2 ON g2.id = m.bijgewerkt_door_id
      WHERE m.id = :id'
@@ -31,6 +32,25 @@ $melding_uitgevoerd = '';
 // ---- Acties (POST) -----------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $actie = $_POST['actie'] ?? '';
+
+    if ($actie === 'classificatie_bijwerken') {
+        $hoofd_id = $_POST['hoofdclassificatie_id'] !== '' ? (int) $_POST['hoofdclassificatie_id'] : null;
+        $sub_id   = $_POST['subclassificatie_id'] !== '' ? (int) $_POST['subclassificatie_id'] : null;
+        if ($sub_id !== null && $hoofd_id === null) {
+            $sub_id = null;
+        }
+        $stmt = $pdo->prepare(
+            'UPDATE meldingen SET hoofdclassificatie_id = :h, subclassificatie_id = :s, bijgewerkt_door_id = :gebruiker WHERE id = :id'
+        );
+        $stmt->execute([
+            'h' => $hoofd_id,
+            's' => $sub_id,
+            'gebruiker' => $_SESSION['gebruiker_id'],
+            'id' => $id,
+        ]);
+        header('Location: /melding.php?id=' . $id . '&bijgewerkt=1');
+        exit;
+    }
 
     if ($actie === 'status_bijwerken') {
         $status      = $_POST['status'] ?? $melding['status'];
@@ -95,6 +115,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $melding = $melding_stmt->fetch();
 }
 
+$hoofdclassificaties = get_hoofdclassificaties($pdo);
+$subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
+
 // ---- Gekoppelde protocollen --------------------------------------------
 $gekoppeld_stmt = $pdo->prepare(
     'SELECT p.* FROM protocollen p
@@ -138,7 +161,8 @@ include __DIR__ . '/includes/header.php';
 
 <div class="kv-grid">
     <div class="kv"><div class="k">Locatie</div><div class="v"><?= e($melding['locatie'] ?: '—') ?></div></div>
-    <div class="kv"><div class="k">Categorie</div><div class="v"><?= e($melding['categorie_naam'] ?: '—') ?></div></div>
+    <div class="kv"><div class="k">Hoofdclassificatie</div><div class="v"><?= e($melding['hoofd_naam'] ?: '—') ?></div></div>
+    <div class="kv"><div class="k">Subclassificatie</div><div class="v"><?= e($melding['sub_naam'] ?: '—') ?></div></div>
     <div class="kv"><div class="k">Gemeld door</div><div class="v"><?= e($melding['gemeld_door'] ?: '—') ?></div></div>
     <div class="kv"><div class="k">Aangemaakt</div><div class="v"><?= (new DateTime($melding['aangemaakt_op']))->format('d-m-Y H:i') ?></div></div>
     <div class="kv"><div class="k">Ingevoerd door</div><div class="v"><?= e($melding['aangemaakt_door_naam'] ?: 'onbekend') ?></div></div>
@@ -151,6 +175,31 @@ include __DIR__ . '/includes/header.php';
         <p style="white-space:pre-line; color: var(--text); margin:0;"><?= e($melding['omschrijving']) ?></p>
     </div>
 <?php endif; ?>
+
+<div class="panel">
+    <h2>Classificatie bijwerken</h2>
+    <form method="post" class="form-grid">
+        <input type="hidden" name="actie" value="classificatie_bijwerken">
+        <div class="field">
+            <label for="hoofdclassificatie_id2">Hoofdclassificatie</label>
+            <select id="hoofdclassificatie_id2" name="hoofdclassificatie_id">
+                <option value="">Geen hoofdclassificatie</option>
+                <?php foreach ($hoofdclassificaties as $h): ?>
+                    <option value="<?= $h['id'] ?>" <?= (int) $melding['hoofdclassificatie_id'] === (int) $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="field">
+            <label for="subclassificatie_id2">Subclassificatie</label>
+            <select id="subclassificatie_id2" name="subclassificatie_id">
+                <option value="">Geen subclassificatie</option>
+            </select>
+        </div>
+        <div class="actions full">
+            <button type="submit" class="btn btn-primary">Classificatie opslaan</button>
+        </div>
+    </form>
+</div>
 
 <div class="panel">
     <h2>Status bijwerken</h2>
@@ -245,5 +294,32 @@ include __DIR__ . '/includes/header.php';
         </div>
     <?php endforeach; ?>
 </div>
+
+<script>
+const subclassificaties2 = <?= json_encode($subs_per_hoofd, JSON_UNESCAPED_UNICODE) ?>;
+const gekozenSub2 = <?= json_encode((string) $melding['subclassificatie_id']) ?>;
+
+const hoofdSelect2 = document.getElementById('hoofdclassificatie_id2');
+const subSelect2 = document.getElementById('subclassificatie_id2');
+
+function vulSubclassificaties2() {
+    const hoofdId = hoofdSelect2.value;
+    subSelect2.innerHTML = '<option value="">Geen subclassificatie</option>';
+    const lijst = subclassificaties2[hoofdId] || [];
+    lijst.forEach(function (sub) {
+        const optie = document.createElement('option');
+        optie.value = sub.id;
+        optie.textContent = sub.naam;
+        if (String(sub.id) === gekozenSub2) {
+            optie.selected = true;
+        }
+        subSelect2.appendChild(optie);
+    });
+    subSelect2.disabled = lijst.length === 0;
+}
+
+hoofdSelect2.addEventListener('change', vulSubclassificaties2);
+vulSubclassificaties2();
+</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

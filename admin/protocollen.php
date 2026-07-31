@@ -13,22 +13,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($actie === 'opslaan') {
         $id           = (int) ($_POST['id'] ?? 0);
         $titel        = trim($_POST['titel'] ?? '');
-        $categorie_id = $_POST['categorie_id'] !== '' ? (int) $_POST['categorie_id'] : null;
+        $hoofdclassificatie_id = $_POST['hoofdclassificatie_id'] !== '' ? (int) $_POST['hoofdclassificatie_id'] : null;
         $inhoud       = trim($_POST['inhoud'] ?? '');
 
         if ($titel === '' || $inhoud === '') {
             $fout = 'Vul zowel een titel als de inhoud van het protocol in.';
         } elseif ($id > 0) {
             $stmt = $pdo->prepare(
-                'UPDATE protocollen SET titel = :t, categorie_id = :c, inhoud = :i WHERE id = :id'
+                'UPDATE protocollen SET titel = :t, hoofdclassificatie_id = :c, inhoud = :i WHERE id = :id'
             );
-            $stmt->execute(['t' => $titel, 'c' => $categorie_id, 'i' => $inhoud, 'id' => $id]);
+            $stmt->execute(['t' => $titel, 'c' => $hoofdclassificatie_id, 'i' => $inhoud, 'id' => $id]);
             $succes = 'Protocol bijgewerkt.';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO protocollen (titel, categorie_id, inhoud) VALUES (:t, :c, :i)'
+                'INSERT INTO protocollen (titel, hoofdclassificatie_id, inhoud) VALUES (:t, :c, :i)'
             );
-            $stmt->execute(['t' => $titel, 'c' => $categorie_id, 'i' => $inhoud]);
+            $stmt->execute(['t' => $titel, 'c' => $hoofdclassificatie_id, 'i' => $inhoud]);
             $succes = 'Protocol aangemaakt.';
         }
     }
@@ -48,7 +48,7 @@ if (isset($_GET['bewerk'])) {
 }
 
 $protocollen = get_protocollen($pdo);
-$categorieen = get_categorieen($pdo);
+$hoofdclassificaties = get_hoofdclassificaties($pdo);
 
 $actief = 'admin';
 $paginatitel = 'Protocollen beheren';
@@ -76,11 +76,11 @@ include __DIR__ . '/../includes/header.php';
             <input type="text" id="titel" name="titel" required value="<?= e($bewerk['titel'] ?? '') ?>" placeholder="bv. Protocol vermist kind">
         </div>
         <div class="field full">
-            <label for="categorie_id">Gekoppelde categorie (optioneel)</label>
-            <select id="categorie_id" name="categorie_id">
-                <option value="">Geen specifieke categorie</option>
-                <?php foreach ($categorieen as $c): ?>
-                    <option value="<?= $c['id'] ?>" <?= (($bewerk['categorie_id'] ?? null) == $c['id']) ? 'selected' : '' ?>><?= e($c['naam']) ?></option>
+            <label for="hoofdclassificatie_id">Gekoppelde hoofdclassificatie (optioneel)</label>
+            <select id="hoofdclassificatie_id" name="hoofdclassificatie_id">
+                <option value="">Geen specifieke hoofdclassificatie</option>
+                <?php foreach ($hoofdclassificaties as $h): ?>
+                    <option value="<?= $h['id'] ?>" <?= (($bewerk['hoofdclassificatie_id'] ?? null) == $h['id']) ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>

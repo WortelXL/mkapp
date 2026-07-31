@@ -5,7 +5,7 @@ $pdo = get_pdo();
 
 // ---- Filters ---------------------------------------------------------
 $f_status     = $_GET['status'] ?? '';
-$f_categorie  = $_GET['categorie'] ?? '';
+$f_hoofd      = $_GET['hoofd'] ?? '';
 $f_prioriteit = $_GET['prioriteit'] ?? '';
 $f_zoek       = trim($_GET['q'] ?? '');
 
@@ -16,9 +16,9 @@ if ($f_status !== '' && in_array($f_status, ['open','in_behandeling','afgehandel
     $where[] = 'm.status = :status';
     $params['status'] = $f_status;
 }
-if ($f_categorie !== '' && ctype_digit($f_categorie)) {
-    $where[] = 'm.categorie_id = :categorie';
-    $params['categorie'] = (int) $f_categorie;
+if ($f_hoofd !== '' && ctype_digit($f_hoofd)) {
+    $where[] = 'm.hoofdclassificatie_id = :hoofd';
+    $params['hoofd'] = (int) $f_hoofd;
 }
 if ($f_prioriteit !== '' && in_array($f_prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
     $where[] = 'm.prioriteit = :prioriteit';
@@ -29,9 +29,13 @@ if ($f_zoek !== '') {
     $params['zoek'] = '%' . $f_zoek . '%';
 }
 
-$sql = "SELECT m.*, c.naam AS categorie_naam, c.kleur AS categorie_kleur, g.naam AS aangemaakt_door_naam
+$sql = "SELECT m.*,
+               h.naam AS hoofd_naam, h.kleur AS hoofd_kleur,
+               s.naam AS sub_naam,
+               g.naam AS aangemaakt_door_naam
         FROM meldingen m
-        LEFT JOIN categorieen c ON c.id = m.categorie_id
+        LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
+        LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
         LEFT JOIN gebruikers g ON g.id = m.aangemaakt_door_id";
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -54,7 +58,7 @@ $kritiek_open   = (int) $pdo->query(
     "SELECT COUNT(*) FROM meldingen WHERE prioriteit='kritiek' AND status NOT IN ('afgehandeld','geannuleerd')"
 )->fetchColumn();
 
-$categorieen = get_categorieen($pdo);
+$hoofdclassificaties = get_hoofdclassificaties($pdo);
 
 $actief = 'dashboard';
 $paginatitel = 'Dashboard';
@@ -103,14 +107,14 @@ include __DIR__ . '/includes/header.php';
             <option value="<?= $p ?>" <?= $f_prioriteit === $p ? 'selected' : '' ?>><?= prioriteit_label($p) ?></option>
         <?php endforeach; ?>
     </select>
-    <select name="categorie">
-        <option value="">Alle categorieen</option>
-        <?php foreach ($categorieen as $c): ?>
-            <option value="<?= $c['id'] ?>" <?= $f_categorie == $c['id'] ? 'selected' : '' ?>><?= e($c['naam']) ?></option>
+    <select name="hoofd">
+        <option value="">Alle hoofdclassificaties</option>
+        <?php foreach ($hoofdclassificaties as $h): ?>
+            <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
         <?php endforeach; ?>
     </select>
     <button type="submit" class="btn btn-small">Filteren</button>
-    <?php if ($f_status || $f_categorie || $f_prioriteit || $f_zoek): ?>
+    <?php if ($f_status || $f_hoofd || $f_prioriteit || $f_zoek): ?>
         <a href="/index.php" class="btn btn-small">Wissen</a>
     <?php endif; ?>
 </form>
@@ -131,9 +135,9 @@ include __DIR__ . '/includes/header.php';
                     · ingevoerd door <?= e($m['aangemaakt_door_naam'] ?: 'onbekend') ?>
                 </span>
             </span>
-            <?php if ($m['categorie_naam']): ?>
-                <span class="cat-chip" style="background: <?= e($m['categorie_kleur']) ?>22; color: <?= e($m['categorie_kleur']) ?>;">
-                    <?= e($m['categorie_naam']) ?>
+            <?php if ($m['hoofd_naam']): ?>
+                <span class="cat-chip" style="background: <?= e($m['hoofd_kleur']) ?>22; color: <?= e($m['hoofd_kleur']) ?>;">
+                    <?= e($m['hoofd_naam']) ?><?= $m['sub_naam'] ? ' · ' . e($m['sub_naam']) : '' ?>
                 </span>
             <?php else: ?>
                 <span></span>

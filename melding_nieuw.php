@@ -6,12 +6,18 @@ $pdo = get_pdo();
 $fout = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $titel        = trim($_POST['titel'] ?? '');
-    $omschrijving = trim($_POST['omschrijving'] ?? '');
-    $categorie_id = $_POST['categorie_id'] !== '' ? (int) $_POST['categorie_id'] : null;
-    $locatie      = trim($_POST['locatie'] ?? '');
-    $prioriteit   = $_POST['prioriteit'] ?? 'normaal';
-    $gemeld_door  = trim($_POST['gemeld_door'] ?? '');
+    $titel                 = trim($_POST['titel'] ?? '');
+    $omschrijving          = trim($_POST['omschrijving'] ?? '');
+    $hoofdclassificatie_id = $_POST['hoofdclassificatie_id'] !== '' ? (int) $_POST['hoofdclassificatie_id'] : null;
+    $subclassificatie_id   = $_POST['subclassificatie_id'] !== '' ? (int) $_POST['subclassificatie_id'] : null;
+    $locatie               = trim($_POST['locatie'] ?? '');
+    $prioriteit            = $_POST['prioriteit'] ?? 'normaal';
+    $gemeld_door           = trim($_POST['gemeld_door'] ?? '');
+
+    // Een subclassificatie zonder de bijbehorende hoofdclassificatie is ongeldig
+    if ($subclassificatie_id !== null && $hoofdclassificatie_id === null) {
+        $subclassificatie_id = null;
+    }
 
     if ($titel === '') {
         $fout = 'Vul een titel in voor de melding.';
@@ -20,14 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $meld_id = genereer_meld_id($pdo);
         $stmt = $pdo->prepare(
-            'INSERT INTO meldingen (meld_id, titel, omschrijving, categorie_id, locatie, prioriteit, gemeld_door, aangemaakt_door_id)
-             VALUES (:meld_id, :titel, :omschrijving, :categorie_id, :locatie, :prioriteit, :gemeld_door, :aangemaakt_door_id)'
+            'INSERT INTO meldingen (meld_id, titel, omschrijving, hoofdclassificatie_id, subclassificatie_id, locatie, prioriteit, gemeld_door, aangemaakt_door_id)
+             VALUES (:meld_id, :titel, :omschrijving, :hoofd, :sub, :locatie, :prioriteit, :gemeld_door, :aangemaakt_door_id)'
         );
         $stmt->execute([
             'meld_id'            => $meld_id,
             'titel'              => $titel,
             'omschrijving'       => $omschrijving ?: null,
-            'categorie_id'       => $categorie_id,
+            'hoofd'              => $hoofdclassificatie_id,
+            'sub'                => $subclassificatie_id,
             'locatie'            => $locatie ?: null,
             'prioriteit'         => $prioriteit,
             'gemeld_door'        => $gemeld_door ?: null,
@@ -38,7 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$categorieen = get_categorieen($pdo);
+$hoofdclassificaties = get_hoofdclassificaties($pdo);
+$subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
+$gekozen_hoofd = $_POST['hoofdclassificatie_id'] ?? '';
+$gekozen_sub   = $_POST['subclassificatie_id'] ?? '';
+
 $actief = 'nieuw';
 $paginatitel = 'Nieuwe melding';
 include __DIR__ . '/includes/header.php';
@@ -81,12 +92,19 @@ include __DIR__ . '/includes/header.php';
             </div>
 
             <div class="field">
-                <label for="categorie_id">Categorie</label>
-                <select id="categorie_id" name="categorie_id">
-                    <option value="">Geen categorie</option>
-                    <?php foreach ($categorieen as $c): ?>
-                        <option value="<?= $c['id'] ?>"><?= e($c['naam']) ?></option>
+                <label for="hoofdclassificatie_id">Hoofdclassificatie</label>
+                <select id="hoofdclassificatie_id" name="hoofdclassificatie_id">
+                    <option value="">Geen hoofdclassificatie</option>
+                    <?php foreach ($hoofdclassificaties as $h): ?>
+                        <option value="<?= $h['id'] ?>" <?= (string) $gekozen_hoofd === (string) $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
                     <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="subclassificatie_id">Subclassificatie</label>
+                <select id="subclassificatie_id" name="subclassificatie_id">
+                    <option value="">Geen subclassificatie</option>
                 </select>
             </div>
 
@@ -106,5 +124,33 @@ include __DIR__ . '/includes/header.php';
         </div>
     </form>
 </div>
+
+<script>
+// Subclassificaties per hoofdclassificatie, aangeleverd door de server
+const subclassificaties = <?= json_encode($subs_per_hoofd, JSON_UNESCAPED_UNICODE) ?>;
+const gekozenSub = <?= json_encode((string) $gekozen_sub) ?>;
+
+const hoofdSelect = document.getElementById('hoofdclassificatie_id');
+const subSelect = document.getElementById('subclassificatie_id');
+
+function vulSubclassificaties() {
+    const hoofdId = hoofdSelect.value;
+    subSelect.innerHTML = '<option value="">Geen subclassificatie</option>';
+    const lijst = subclassificaties[hoofdId] || [];
+    lijst.forEach(function (sub) {
+        const optie = document.createElement('option');
+        optie.value = sub.id;
+        optie.textContent = sub.naam;
+        if (String(sub.id) === gekozenSub) {
+            optie.selected = true;
+        }
+        subSelect.appendChild(optie);
+    });
+    subSelect.disabled = lijst.length === 0;
+}
+
+hoofdSelect.addEventListener('change', vulSubclassificaties);
+vulSubclassificaties();
+</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

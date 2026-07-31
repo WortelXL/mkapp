@@ -110,7 +110,7 @@ include __DIR__ . '/../includes/header.php';
     <div>
         <p class="eyebrow"><a href="/admin/index.php" style="color:var(--muted); text-decoration:none;">&larr; Beheer</a></p>
         <h1>Gebruikers</h1>
-        <p>Beheerders hebben toegang tot categorieen, protocollen en gebruikersbeheer. Medewerkers kunnen meldingen bekijken, aanmaken en bijwerken.</p>
+        <p>Beheerders hebben toegang tot classificaties, protocollen en gebruikersbeheer. Medewerkers kunnen meldingen bekijken, aanmaken en bijwerken.</p>
     </div>
 </div>
 

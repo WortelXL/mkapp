@@ -44,10 +44,31 @@ function genereer_meld_id(PDO $pdo): string
     return $prefix . str_pad((string) $volgnummer, 3, '0', STR_PAD_LEFT);
 }
 
-/** Haalt alle categorieen op, alfabetisch gesorteerd */
-function get_categorieen(PDO $pdo): array
+/** Haalt alle hoofdclassificaties op, alfabetisch gesorteerd */
+function get_hoofdclassificaties(PDO $pdo): array
 {
-    return $pdo->query('SELECT * FROM categorieen ORDER BY naam ASC')->fetchAll();
+    return $pdo->query('SELECT * FROM hoofdclassificaties ORDER BY naam ASC')->fetchAll();
+}
+
+/** Haalt subclassificaties op, optioneel gefilterd op 1 hoofdclassificatie */
+function get_subclassificaties(PDO $pdo, ?int $hoofdclassificatie_id = null): array
+{
+    if ($hoofdclassificatie_id !== null) {
+        $stmt = $pdo->prepare('SELECT * FROM subclassificaties WHERE hoofdclassificatie_id = :h ORDER BY naam ASC');
+        $stmt->execute(['h' => $hoofdclassificatie_id]);
+        return $stmt->fetchAll();
+    }
+    return $pdo->query('SELECT * FROM subclassificaties ORDER BY naam ASC')->fetchAll();
+}
+
+/** Alle subclassificaties gegroepeerd per hoofdclassificatie_id, handig voor JS-dropdowns */
+function get_subclassificaties_gegroepeerd(PDO $pdo): array
+{
+    $gegroepeerd = [];
+    foreach (get_subclassificaties($pdo) as $sub) {
+        $gegroepeerd[(int) $sub['hoofdclassificatie_id']][] = $sub;
+    }
+    return $gegroepeerd;
 }
 
 /** Haalt alle protocollen op */
