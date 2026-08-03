@@ -198,9 +198,11 @@ Beschikbare velden:
 |-----------------|-----------|--------------|
 | `titel`         | Nee       | Korte omschrijving. Ontbreekt dit, dan wordt de titel automatisch "Hoofdclassificatie - Subclassificatie" |
 | `classificatie` | Nee       | Naam van een hoofd- of subclassificatie (bv. `medisch` of `reanimatie`) — wordt op dezelfde manier herkend als het zoekcommando op het dashboard |
+| `subclassificatie` | Nee    | Naam van een subclassificatie, direct en specifiek. Wint van `classificatie` als beide zijn meegestuurd; de hoofdclassificatie wordt automatisch overgenomen |
+| `status`        | Nee       | `open` / `in_behandeling` / `afgehandeld` / `geannuleerd`. Standaard `open` |
 | `prioriteit`    | Nee       | `laag` / `normaal` / `hoog` / `kritiek`. Ontbreekt dit, dan wordt de standaardprioriteit van de gevonden subclassificatie gebruikt, anders `normaal` |
 | `locatie`       | Nee       | |
-| `omschrijving`  | Nee       | |
+| `omschrijving`  | Nee       | Ondersteunt ook het `;locatienaam`-commando |
 | `gemeld_door`   | Nee       | Standaard "Stream Deck (naam gebruiker)" |
 
 Bij succes antwoordt de API met `201` en JSON: `{"success": true, "id": 42, "meld_id": "MK-D2-014"}`.

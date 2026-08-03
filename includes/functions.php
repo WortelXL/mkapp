@@ -150,6 +150,29 @@ function vind_locatie_commando(PDO $pdo, string $tekst): ?array
     return $stmt->fetch() ?: null;
 }
 
+/**
+ * Zoekt een subclassificatie direct op naam (exact, anders gedeeltelijk).
+ * Gebruikt door de API als iemand een subclassificatie expliciet wil
+ * kiezen, los van het bredere classificatie-zoekcommando.
+ */
+function vind_subclassificatie_op_naam(PDO $pdo, string $naam): ?array
+{
+    $naam = trim($naam);
+    if ($naam === '') {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM subclassificaties WHERE naam = :n LIMIT 1');
+    $stmt->execute(['n' => $naam]);
+    if ($rij = $stmt->fetch()) {
+        return $rij;
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM subclassificaties WHERE naam LIKE :n ORDER BY naam ASC LIMIT 1');
+    $stmt->execute(['n' => '%' . $naam . '%']);
+    return $stmt->fetch() ?: null;
+}
+
 /** Haalt alle protocollen op, met naam van gekoppelde sub-/hoofdclassificatie erbij */
 function get_protocollen(PDO $pdo): array
 {

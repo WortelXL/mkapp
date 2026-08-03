@@ -15,6 +15,13 @@
  *   classificatie  (optioneel) - naam van een hoofd- of subclassificatie,
  *                    bv. "medisch" of "reanimatie". Wordt op dezelfde manier
  *                    herkend als het zoekcommando op het dashboard.
+ *   subclassificatie (optioneel) - naam van een subclassificatie, direct en
+ *                    specifiek (niet gecombineerd zoeken zoals bij
+ *                    "classificatie"). Wint van "classificatie" als beide
+ *                    zijn meegestuurd. De bijbehorende hoofdclassificatie
+ *                    wordt er automatisch bij gezet.
+ *   status         (optioneel) - open/in_behandeling/afgehandeld/geannuleerd.
+ *                    Standaard "open".
  *   prioriteit     (optioneel) - laag/normaal/hoog/kritiek. Ontbreekt dit,
  *                    dan wordt de standaardprioriteit van de gevonden
  *                    subclassificatie gebruikt, anders "normaal".
@@ -71,12 +78,14 @@ if (!$gebruiker || !$gebruiker['actief']) {
 // titel net als in de webinterface samengesteld uit de classificatie
 // ("Hoofdclassificatie - Subclassificatie"). Wil je toch een eigen titel
 // meesturen vanaf de Stream Deck, dan kan dat nog steeds.
-$titel_override      = trim($_POST['titel'] ?? '');
-$omschrijving        = trim($_POST['omschrijving'] ?? '');
-$locatie             = trim($_POST['locatie'] ?? '');
-$gemeld_door         = trim($_POST['gemeld_door'] ?? '');
-$classificatie_tekst = trim($_POST['classificatie'] ?? '');
-$prioriteit_input    = trim($_POST['prioriteit'] ?? '');
+$titel_override        = trim($_POST['titel'] ?? '');
+$omschrijving          = trim($_POST['omschrijving'] ?? '');
+$locatie               = trim($_POST['locatie'] ?? '');
+$gemeld_door           = trim($_POST['gemeld_door'] ?? '');
+$classificatie_tekst   = trim($_POST['classificatie'] ?? '');
+$subclassificatie_tekst = trim($_POST['subclassificatie'] ?? '');
+$prioriteit_input      = trim($_POST['prioriteit'] ?? '');
+$status_input          = trim($_POST['status'] ?? '');
 
 $hoofd_id = null;
 $sub_id = null;
@@ -95,6 +104,17 @@ if ($classificatie_tekst !== '') {
     }
 }
 
+// "subclassificatie" is specifieker en wint van "classificatie" als beide
+// zijn meegestuurd; de hoofdclassificatie wordt automatisch overgenomen.
+if ($subclassificatie_tekst !== '') {
+    $sub_gevonden = vind_subclassificatie_op_naam($pdo, $subclassificatie_tekst);
+    if ($sub_gevonden) {
+        $hoofd_id = (int) $sub_gevonden['hoofdclassificatie_id'];
+        $sub_id   = (int) $sub_gevonden['id'];
+        $standaard_prioriteit = $sub_gevonden['standaard_prioriteit'] ?: null;
+    }
+}
+
 $titel = $titel_override !== '' ? $titel_override : bereken_melding_titel($pdo, $hoofd_id, $sub_id);
 
 $geldige_prioriteiten = ['laag', 'normaal', 'hoog', 'kritiek'];
@@ -106,11 +126,18 @@ if (in_array($prioriteit_input, $geldige_prioriteiten, true)) {
     $prioriteit = 'normaal';
 }
 
+$geldige_statussen = ['open', 'in_behandeling', 'afgehandeld', 'geannuleerd'];
+if (in_array($status_input, $geldige_statussen, true)) {
+    $status = $status_input;
+} else {
+    $status = 'open';
+}
+
 // ---- Melding aanmaken -----------------------------------------------------
 $meld_id = genereer_meld_id($pdo);
 $stmt = $pdo->prepare(
-    'INSERT INTO meldingen (meld_id, titel, omschrijving, hoofdclassificatie_id, subclassificatie_id, locatie, prioriteit, gemeld_door, aangemaakt_door_id)
-     VALUES (:meld_id, :titel, :omschrijving, :hoofd, :sub, :locatie, :prioriteit, :gemeld_door, :gebruiker)'
+    'INSERT INTO meldingen (meld_id, titel, omschrijving, hoofdclassificatie_id, subclassificatie_id, locatie, prioriteit, status, gemeld_door, aangemaakt_door_id)
+     VALUES (:meld_id, :titel, :omschrijving, :hoofd, :sub, :locatie, :prioriteit, :status, :gemeld_door, :gebruiker)'
 );
 $stmt->execute([
     'meld_id'      => $meld_id,
@@ -120,12 +147,14 @@ $stmt->execute([
     'sub'          => $sub_id,
     'locatie'      => $locatie ?: null,
     'prioriteit'   => $prioriteit,
+    'status'       => $status,
     'gemeld_door'  => $gemeld_door ?: ('Stream Deck (' . $gebruiker['naam'] . ')'),
     'gebruiker'    => $gebruiker['id'],
 ]);
 
 api_antwoord(201, [
-    'success' => true,
-    'id'      => (int) $pdo->lastInsertId(),
-    'meld_id' => $meld_id,
+    'success'  => true,
+    'id'       => (int) $pdo->lastInsertId(),
+    'meld_id'  => $meld_id,
+    'status'   => $status,
 ]);
