@@ -6,7 +6,6 @@ $pdo = get_pdo();
 $fout = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $titel                 = trim($_POST['titel'] ?? '');
     $omschrijving          = trim($_POST['omschrijving'] ?? '');
     $hoofdclassificatie_id = $_POST['hoofdclassificatie_id'] !== '' ? (int) $_POST['hoofdclassificatie_id'] : null;
     $subclassificatie_id   = $_POST['subclassificatie_id'] !== '' ? (int) $_POST['subclassificatie_id'] : null;
@@ -19,11 +18,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subclassificatie_id = null;
     }
 
-    if ($titel === '') {
-        $fout = 'Vul een titel in voor de melding.';
-    } elseif (!in_array($prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
+    // ;locatienaam-commando in de omschrijving overschrijft het locatieveld
+    // als het een vooraf ingestelde locatie matcht
+    $locatie_via_commando = vind_locatie_commando($pdo, $omschrijving);
+    if ($locatie_via_commando) {
+        $locatie = $locatie_via_commando['naam'];
+    }
+
+    if (!in_array($prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
         $fout = 'Ongeldige prioriteit.';
     } else {
+        $titel = bereken_melding_titel($pdo, $hoofdclassificatie_id, $subclassificatie_id);
         $meld_id = genereer_meld_id($pdo);
         $stmt = $pdo->prepare(
             'INSERT INTO meldingen (meld_id, titel, omschrijving, hoofdclassificatie_id, subclassificatie_id, locatie, prioriteit, gemeld_door, aangemaakt_door_id)
@@ -71,13 +76,14 @@ include __DIR__ . '/includes/header.php';
     <form method="post">
         <div class="form-grid">
             <div class="field full">
-                <label for="titel">Titel</label>
-                <input type="text" id="titel" name="titel" required value="<?= e($_POST['titel'] ?? '') ?>" placeholder="Korte omschrijving van de melding">
+                <label>Titel (automatisch, op basis van classificatie)</label>
+                <div id="titel_voorbeeld" style="padding:10px 12px; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; color:var(--muted); font-size:14px;">Ongeclassificeerde melding</div>
             </div>
 
             <div class="field full">
                 <label for="omschrijving">Omschrijving</label>
                 <textarea id="omschrijving" name="omschrijving" placeholder="Wat is er precies aan de hand?"><?= e($_POST['omschrijving'] ?? '') ?></textarea>
+                <p style="color:var(--muted); font-size:12px; margin:6px 0 0;">Tip: typ <code>;locatienaam</code> ergens in de tekst (bv. <code>;podium1</code>) om het locatieveld hieronder automatisch in te vullen met een vooraf ingestelde locatie.</p>
             </div>
 
             <div class="field">
@@ -161,8 +167,27 @@ subSelect.addEventListener('change', function () {
     }
 });
 
-hoofdSelect.addEventListener('change', vulSubclassificaties);
+// Toont een live voorbeeld van de titel die wordt opgeslagen: "Hoofd - Sub"
+const titelVoorbeeld = document.getElementById('titel_voorbeeld');
+function werkTitelVoorbeeldBij() {
+    const hoofdTekst = hoofdSelect.value ? hoofdSelect.options[hoofdSelect.selectedIndex].text : '';
+    const subTekst = subSelect.value ? subSelect.options[subSelect.selectedIndex].text : '';
+    if (!hoofdTekst) {
+        titelVoorbeeld.textContent = 'Ongeclassificeerde melding';
+    } else if (subTekst) {
+        titelVoorbeeld.textContent = hoofdTekst + ' - ' + subTekst;
+    } else {
+        titelVoorbeeld.textContent = hoofdTekst;
+    }
+}
+subSelect.addEventListener('change', werkTitelVoorbeeldBij);
+
+hoofdSelect.addEventListener('change', function () {
+    vulSubclassificaties();
+    werkTitelVoorbeeldBij();
+});
 vulSubclassificaties();
+werkTitelVoorbeeldBij();
 </script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

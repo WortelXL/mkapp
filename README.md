@@ -139,6 +139,14 @@ aanmaken/verwijderen. Een hoofdclassificatie verwijderen verwijdert ook
 de subclassificaties eronder; meldingen met die classificatie blijven
 gewoon bestaan, maar verliezen de koppeling.
 
+**Titel van een melding.** Er is geen los titelveld meer bij het aanmaken
+van een melding — de titel wordt automatisch samengesteld als
+"Hoofdclassificatie - Subclassificatie" (bv. "Medisch - Reanimatie"), of
+alleen de hoofdclassificatie als er geen subclassificatie gekozen is, of
+"Ongeclassificeerde melding" als er helemaal geen classificatie is gekozen.
+Wijzig je de classificatie later op de melddetailpagina, dan wordt de
+titel automatisch mee bijgewerkt.
+
 ## Gebruik
 
 - **Dashboard (`/index.php`)** — live overzicht van alle meldingen met
@@ -174,13 +182,12 @@ heeft aangemaakt) en werkt als een wachtwoord — behandel het ook zo.
 
 **2. Aanroepen.** `POST` naar `/api/melding.php` met het token in de
 header (`Authorization: Bearer <token>`) of als veld `token` in de body
-(handig als je plugin geen custom headers ondersteunt), plus minimaal een
-`titel`:
+(handig als je plugin geen custom headers ondersteunt). Alle velden zijn
+optioneel — meestal volstaat `classificatie`:
 
 ```bash
 curl -X POST https://jouw-domein/api/melding.php \
   -H "Authorization: Bearer <token>" \
-  -d "titel=Persoon onwel bij hoofdpodium" \
   -d "classificatie=reanimatie" \
   -d "locatie=Podium 1"
 ```
@@ -189,7 +196,7 @@ Beschikbare velden:
 
 | Veld            | Verplicht | Omschrijving |
 |-----------------|-----------|--------------|
-| `titel`         | Ja        | Korte omschrijving van de melding |
+| `titel`         | Nee       | Korte omschrijving. Ontbreekt dit, dan wordt de titel automatisch "Hoofdclassificatie - Subclassificatie" |
 | `classificatie` | Nee       | Naam van een hoofd- of subclassificatie (bv. `medisch` of `reanimatie`) — wordt op dezelfde manier herkend als het zoekcommando op het dashboard |
 | `prioriteit`    | Nee       | `laag` / `normaal` / `hoog` / `kritiek`. Ontbreekt dit, dan wordt de standaardprioriteit van de gevonden subclassificatie gebruikt, anders `normaal` |
 | `locatie`       | Nee       | |
@@ -212,6 +219,20 @@ zichzelf automatisch (interval instelbaar per gebruiker, zie hieronder),
 zodat een melding die via de API of door een collega wordt aangemaakt
 vanzelf verschijnt bij iedereen die het dashboard open heeft staan —
 niemand hoeft handmatig te verversen.
+
+## Vooraf ingestelde locaties
+
+Beheerders kunnen via **Beheer &rarr; Locaties** (`/admin/locaties.php`)
+een lijst met vaste locaties bijhouden (bv. "Podium 1", "Ingang Noord"),
+inclusief een optionele beschrijving.
+
+Typ je ergens in de **omschrijving** bij het aanmaken van een nieuwe
+melding, of in een **notitie** op de melddetailpagina, een `;` gevolgd door
+(een deel van) een locatienaam — bv. `Ambulance ter plaatse ;podium1` —
+dan wordt het locatieveld van de melding automatisch bijgewerkt naar de
+gevonden locatie. Exacte namen gaan voor; is er geen exacte match, dan
+wordt een gedeeltelijke match gebruikt. Matcht niets, dan gebeurt er
+stilzwijgend niets (de tekst zelf blijft gewoon staan zoals getypt).
 
 ## Persoonlijke instellingen
 

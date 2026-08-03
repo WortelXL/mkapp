@@ -9,7 +9,9 @@
  *                custom headers ondersteunen).
  *
  * Velden (form-data of x-www-form-urlencoded):
- *   titel          (verplicht)
+ *   titel          (optioneel) - ontbreekt dit, dan wordt de titel net als
+ *                    in de webinterface samengesteld uit de classificatie
+ *                    ("Hoofdclassificatie - Subclassificatie")
  *   classificatie  (optioneel) - naam van een hoofd- of subclassificatie,
  *                    bv. "medisch" of "reanimatie". Wordt op dezelfde manier
  *                    herkend als het zoekcommando op het dashboard.
@@ -65,11 +67,11 @@ if (!$gebruiker || !$gebruiker['actief']) {
 }
 
 // ---- Velden -------------------------------------------------------------
-$titel = trim($_POST['titel'] ?? '');
-if ($titel === '') {
-    api_antwoord(422, ['success' => false, 'error' => 'Veld "titel" is verplicht.']);
-}
-
+// "titel" is optioneel: geef je 'm niet mee (of laat 'm leeg), dan wordt de
+// titel net als in de webinterface samengesteld uit de classificatie
+// ("Hoofdclassificatie - Subclassificatie"). Wil je toch een eigen titel
+// meesturen vanaf de Stream Deck, dan kan dat nog steeds.
+$titel_override      = trim($_POST['titel'] ?? '');
 $omschrijving        = trim($_POST['omschrijving'] ?? '');
 $locatie             = trim($_POST['locatie'] ?? '');
 $gemeld_door         = trim($_POST['gemeld_door'] ?? '');
@@ -92,6 +94,8 @@ if ($classificatie_tekst !== '') {
         }
     }
 }
+
+$titel = $titel_override !== '' ? $titel_override : bereken_melding_titel($pdo, $hoofd_id, $sub_id);
 
 $geldige_prioriteiten = ['laag', 'normaal', 'hoog', 'kritiek'];
 if (in_array($prioriteit_input, $geldige_prioriteiten, true)) {

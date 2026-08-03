@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS gebruikers (
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Vooraf ingestelde locaties. Kunnen in de omschrijving (bij een nieuwe
+-- melding) of in een notitie opgeroepen worden met ";naam", waarna het
+-- locatieveld van de melding automatisch wordt bijgewerkt bij een match.
+CREATE TABLE IF NOT EXISTS locaties (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    naam VARCHAR(150) NOT NULL UNIQUE,
+    beschrijving VARCHAR(255) DEFAULT NULL,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Hoofdclassificatie, bv. "Medisch", "Beveiliging", "Techniek"
 CREATE TABLE IF NOT EXISTS hoofdclassificaties (
     id INT AUTO_INCREMENT PRIMARY KEY,

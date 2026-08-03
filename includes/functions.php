@@ -115,6 +115,41 @@ function get_subclassificaties_gegroepeerd(PDO $pdo): array
     return $gegroepeerd;
 }
 
+/** Haalt alle vooraf ingestelde locaties op, alfabetisch */
+function get_locaties(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM locaties ORDER BY naam ASC')->fetchAll();
+}
+
+/**
+ * Zoekt naar een ";locatienaam"-commando in vrije tekst (omschrijving of
+ * notitie) en probeert dat te matchen met een vooraf ingestelde locatie.
+ * Pakt het laatste ";..."-stuk in de tekst, tot het einde van de regel.
+ * Exacte naam-match heeft voorrang op een gedeeltelijke match.
+ * Retourneert de gevonden locatierij, of null als er geen commando is
+ * gebruikt of niets matcht.
+ */
+function vind_locatie_commando(PDO $pdo, string $tekst): ?array
+{
+    if (!preg_match('/;\s*([^\n;]+)\s*$/', rtrim($tekst), $match)) {
+        return null;
+    }
+    $zoekterm = trim($match[1]);
+    if ($zoekterm === '') {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM locaties WHERE naam = :z LIMIT 1');
+    $stmt->execute(['z' => $zoekterm]);
+    if ($rij = $stmt->fetch()) {
+        return $rij;
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM locaties WHERE naam LIKE :z ORDER BY naam ASC LIMIT 1');
+    $stmt->execute(['z' => '%' . $zoekterm . '%']);
+    return $stmt->fetch() ?: null;
+}
+
 /** Haalt alle protocollen op, met naam van gekoppelde sub-/hoofdclassificatie erbij */
 function get_protocollen(PDO $pdo): array
 {
@@ -314,6 +349,38 @@ function genereer_api_token(): string
 }
 
 /** Haalt de persoonlijke instellingen van de ingelogde gebruiker op (met veilige standaardwaarden) */
+/**
+ * Stelt de titel van een melding samen uit de classificatie:
+ * "Hoofdclassificatie - Subclassificatie", of alleen de hoofdclassificatie
+ * als er geen subclassificatie gekozen is, of een neutrale placeholder
+ * als er helemaal geen classificatie is.
+ */
+function bereken_melding_titel(PDO $pdo, ?int $hoofd_id, ?int $sub_id): string
+{
+    if (!$hoofd_id) {
+        return 'Ongeclassificeerde melding';
+    }
+
+    $stmt = $pdo->prepare('SELECT naam FROM hoofdclassificaties WHERE id = :id');
+    $stmt->execute(['id' => $hoofd_id]);
+    $hoofd_naam = $stmt->fetchColumn();
+
+    if (!$hoofd_naam) {
+        return 'Ongeclassificeerde melding';
+    }
+
+    if ($sub_id) {
+        $stmt = $pdo->prepare('SELECT naam FROM subclassificaties WHERE id = :id');
+        $stmt->execute(['id' => $sub_id]);
+        $sub_naam = $stmt->fetchColumn();
+        if ($sub_naam) {
+            return $hoofd_naam . ' - ' . $sub_naam;
+        }
+    }
+
+    return $hoofd_naam;
+}
+
 function huidige_gebruiker_instellingen(PDO $pdo): array
 {
     $standaard = ['auto_refresh_seconden' => 20, 'geluid_nieuwe_melding' => 1];

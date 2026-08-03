@@ -39,10 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($sub_id !== null && $hoofd_id === null) {
             $sub_id = null;
         }
+        $titel = bereken_melding_titel($pdo, $hoofd_id, $sub_id);
         $stmt = $pdo->prepare(
-            'UPDATE meldingen SET hoofdclassificatie_id = :h, subclassificatie_id = :s, bijgewerkt_door_id = :gebruiker WHERE id = :id'
+            'UPDATE meldingen SET titel = :titel, hoofdclassificatie_id = :h, subclassificatie_id = :s, bijgewerkt_door_id = :gebruiker WHERE id = :id'
         );
         $stmt->execute([
+            'titel' => $titel,
             'h' => $hoofd_id,
             's' => $sub_id,
             'gebruiker' => $_SESSION['gebruiker_id'],
@@ -132,6 +134,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'a' => huidige_gebruiker_naam(),
                 'g' => $_SESSION['gebruiker_id'],
             ]);
+
+            // ;locatienaam-commando in de notitie werkt het locatieveld bij
+            $locatie_via_commando = vind_locatie_commando($pdo, $notitie);
+            if ($locatie_via_commando) {
+                $loc_stmt = $pdo->prepare(
+                    'UPDATE meldingen SET locatie = :loc, bijgewerkt_door_id = :gebruiker WHERE id = :id'
+                );
+                $loc_stmt->execute([
+                    'loc' => $locatie_via_commando['naam'],
+                    'gebruiker' => $_SESSION['gebruiker_id'],
+                    'id' => $id,
+                ]);
+            }
         }
         header('Location: /melding.php?id=' . $id . '#log');
         exit;
@@ -189,6 +204,19 @@ include __DIR__ . '/includes/header.php';
         <span class="tag <?= prioriteit_class($melding['prioriteit']) ?>"><?= prioriteit_label($melding['prioriteit']) ?></span>
         <span class="tag <?= status_class($melding['status']) ?>"><span class="tag-dot"></span><?= status_label($melding['status']) ?></span>
     </div>
+</div>
+
+<div class="panel">
+    <h2>Logboek</h2>
+    <?php if (!$notities): ?>
+        <p style="color: var(--muted);">Nog geen notities.</p>
+    <?php endif; ?>
+    <?php foreach ($notities as $n): ?>
+        <div class="note">
+            <div><?= nl2br(e($n['notitie'])) ?></div>
+            <div class="meta"><?= e($n['auteur'] ?: 'Onbekend') ?> · <?= (new DateTime($n['aangemaakt_op']))->format('d-m-Y H:i') ?></div>
+        </div>
+    <?php endforeach; ?>
 </div>
 
 <div class="kv-grid">
@@ -276,6 +304,7 @@ include __DIR__ . '/includes/header.php';
                 <div class="field">
                     <label for="notitie">Nieuwe notitie (als <?= e(huidige_gebruiker_naam()) ?>)</label>
                     <textarea id="notitie" name="notitie" placeholder="Update, actie ondernomen, overdracht..." required></textarea>
+                    <p style="color:var(--muted); font-size:11.5px; margin:6px 0 0;">Tip: typ <code>;locatienaam</code> om de locatie van deze melding automatisch bij te werken.</p>
                 </div>
                 <div class="actions">
                     <button type="submit" class="btn btn-primary">Notitie toevoegen</button>
@@ -350,19 +379,6 @@ include __DIR__ . '/includes/header.php';
             <?php endif; ?>
         </div>
     </div>
-</div>
-
-<div class="panel">
-    <h2>Logboek</h2>
-    <?php if (!$notities): ?>
-        <p style="color: var(--muted);">Nog geen notities.</p>
-    <?php endif; ?>
-    <?php foreach ($notities as $n): ?>
-        <div class="note">
-            <div><?= nl2br(e($n['notitie'])) ?></div>
-            <div class="meta"><?= e($n['auteur'] ?: 'Onbekend') ?> · <?= (new DateTime($n['aangemaakt_op']))->format('d-m-Y H:i') ?></div>
-        </div>
-    <?php endforeach; ?>
 </div>
 
 <script>
