@@ -6,8 +6,38 @@ $pdo = get_pdo();
 // ---- Filters ---------------------------------------------------------
 $f_status     = $_GET['status'] ?? '';
 $f_hoofd      = $_GET['hoofd'] ?? '';
+$f_sub        = $_GET['sub'] ?? '';
 $f_prioriteit = $_GET['prioriteit'] ?? '';
 $f_zoek       = trim($_GET['q'] ?? '');
+
+// ---- Commando in de zoekbalk: "-medisch" of "-reanimatie" -----------
+// Vervangt de zoekterm door een echt hoofd-/subclassificatiefilter en
+// ververst de pagina met een schone URL.
+$commando_niet_gevonden = null;
+if ($f_zoek !== '' && $f_zoek[0] === '-') {
+    $commando = trim(substr($f_zoek, 1));
+    $gevonden = $commando !== '' ? vind_classificatie_commando($pdo, $commando) : null;
+
+    if ($gevonden) {
+        $redirect_params = ['hoofd' => $gevonden['hoofd_id'], 'via' => 'commando'];
+        if (!empty($gevonden['sub_id'])) {
+            $redirect_params['sub'] = $gevonden['sub_id'];
+        }
+        if ($f_status !== '') {
+            $redirect_params['status'] = $f_status;
+        }
+        if ($f_prioriteit !== '') {
+            $redirect_params['prioriteit'] = $f_prioriteit;
+        }
+        header('Location: /index.php?' . http_build_query($redirect_params));
+        exit;
+    }
+
+    // Geen classificatie gevonden voor dit commando: laat het zien, en
+    // val terug op een gewone tekstzoekopdracht zonder het streepje.
+    $commando_niet_gevonden = $commando;
+    $f_zoek = $commando;
+}
 
 $where  = [];
 $params = [];
@@ -19,6 +49,10 @@ if ($f_status !== '' && in_array($f_status, ['open','in_behandeling','afgehandel
 if ($f_hoofd !== '' && ctype_digit($f_hoofd)) {
     $where[] = 'm.hoofdclassificatie_id = :hoofd';
     $params['hoofd'] = (int) $f_hoofd;
+}
+if ($f_sub !== '' && ctype_digit($f_sub)) {
+    $where[] = 'm.subclassificatie_id = :sub';
+    $params['sub'] = (int) $f_sub;
 }
 if ($f_prioriteit !== '' && in_array($f_prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
     $where[] = 'm.prioriteit = :prioriteit';
@@ -93,8 +127,35 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php if (isset($_GET['via']) && $_GET['via'] === 'commando' && $f_hoofd): ?>
+    <?php
+        $hoofd_naam_geselecteerd = '';
+        foreach ($hoofdclassificaties as $h) {
+            if ((string) $h['id'] === (string) $f_hoofd) {
+                $hoofd_naam_geselecteerd = $h['naam'];
+                break;
+            }
+        }
+        $sub_naam_geselecteerd = null;
+        if ($f_sub) {
+            $sub_stmt = $pdo->prepare('SELECT naam FROM subclassificaties WHERE id = :id');
+            $sub_stmt->execute(['id' => $f_sub]);
+            $sub_naam_geselecteerd = $sub_stmt->fetchColumn() ?: null;
+        }
+    ?>
+    <div class="alert alert-success">
+        Filter toegepast via commando: <strong><?= e($hoofd_naam_geselecteerd) ?></strong><?= $sub_naam_geselecteerd ? ' · ' . e($sub_naam_geselecteerd) : '' ?>
+    </div>
+<?php endif; ?>
+
+<?php if ($commando_niet_gevonden !== null): ?>
+    <div class="alert alert-error">
+        Geen classificatie gevonden voor "-<?= e($commando_niet_gevonden) ?>" — in plaats daarvan gezocht op tekst.
+    </div>
+<?php endif; ?>
+
 <form class="filters" method="get">
-    <input type="text" name="q" placeholder="Zoek op titel, ID of locatie..." value="<?= e($f_zoek) ?>">
+    <input type="text" name="q" placeholder="Zoek, of typ -classificatienaam..." value="<?= e($f_zoek) ?>">
     <select name="status">
         <option value="">Alle statussen</option>
         <?php foreach (['open','in_behandeling','afgehandeld','geannuleerd'] as $s): ?>
@@ -113,8 +174,11 @@ include __DIR__ . '/includes/header.php';
             <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
         <?php endforeach; ?>
     </select>
+    <?php if ($f_sub): ?>
+        <input type="hidden" name="sub" value="<?= (int) $f_sub ?>">
+    <?php endif; ?>
     <button type="submit" class="btn btn-small">Filteren</button>
-    <?php if ($f_status || $f_hoofd || $f_prioriteit || $f_zoek): ?>
+    <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek): ?>
         <a href="/index.php" class="btn btn-small">Wissen</a>
     <?php endif; ?>
 </form>
