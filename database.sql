@@ -24,12 +24,15 @@ CREATE TABLE IF NOT EXISTS hoofdclassificaties (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Subclassificatie, hangt altijd onder precies 1 hoofdclassificatie,
--- bv. hoofdclassificatie "Medisch" -> subclassificatie "Reanimatie"
+-- bv. hoofdclassificatie "Medisch" -> subclassificatie "Reanimatie".
+-- standaard_prioriteit wordt als voorstel getoond bij het aanmaken van
+-- een nieuwe melding met deze subclassificatie (blijft aanpasbaar).
 CREATE TABLE IF NOT EXISTS subclassificaties (
     id INT AUTO_INCREMENT PRIMARY KEY,
     hoofdclassificatie_id INT NOT NULL,
     naam VARCHAR(100) NOT NULL,
     beschrijving VARCHAR(255) DEFAULT NULL,
+    standaard_prioriteit ENUM('laag','normaal','hoog','kritiek') DEFAULT NULL,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (hoofdclassificatie_id) REFERENCES hoofdclassificaties(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

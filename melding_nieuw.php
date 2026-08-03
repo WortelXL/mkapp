@@ -141,6 +141,7 @@ function vulSubclassificaties() {
         const optie = document.createElement('option');
         optie.value = sub.id;
         optie.textContent = sub.naam;
+        optie.dataset.standaardPrioriteit = sub.standaard_prioriteit || '';
         if (String(sub.id) === gekozenSub) {
             optie.selected = true;
         }
@@ -148,6 +149,17 @@ function vulSubclassificaties() {
     });
     subSelect.disabled = lijst.length === 0;
 }
+
+// Stelt de prioriteit automatisch voor op basis van de gekozen
+// subclassificatie (blijft gewoon handmatig aanpasbaar door de gebruiker)
+const prioriteitSelect = document.getElementById('prioriteit');
+subSelect.addEventListener('change', function () {
+    const optie = subSelect.options[subSelect.selectedIndex];
+    const standaard = optie ? optie.dataset.standaardPrioriteit : '';
+    if (standaard) {
+        prioriteitSelect.value = standaard;
+    }
+});
 
 hoofdSelect.addEventListener('change', vulSubclassificaties);
 vulSubclassificaties();

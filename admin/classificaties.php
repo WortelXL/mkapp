@@ -38,14 +38,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hoofd_id     = (int) ($_POST['hoofdclassificatie_id'] ?? 0);
         $naam         = trim($_POST['naam'] ?? '');
         $beschrijving = trim($_POST['beschrijving'] ?? '');
+        $prioriteit   = $_POST['standaard_prioriteit'] ?? '';
+        $prioriteit   = in_array($prioriteit, ['laag','normaal','hoog','kritiek'], true) ? $prioriteit : null;
 
         if ($hoofd_id <= 0 || $naam === '') {
             $fout = 'Kies een hoofdclassificatie en vul een naam voor de subclassificatie in.';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO subclassificaties (hoofdclassificatie_id, naam, beschrijving) VALUES (:h, :n, :b)'
+                'INSERT INTO subclassificaties (hoofdclassificatie_id, naam, beschrijving, standaard_prioriteit) VALUES (:h, :n, :b, :p)'
             );
-            $stmt->execute(['h' => $hoofd_id, 'n' => $naam, 'b' => $beschrijving ?: null]);
+            $stmt->execute(['h' => $hoofd_id, 'n' => $naam, 'b' => $beschrijving ?: null, 'p' => $prioriteit]);
             $succes = 'Subclassificatie "' . $naam . '" is aangemaakt.';
         }
     }
@@ -55,6 +57,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare('DELETE FROM subclassificaties WHERE id = :id');
         $stmt->execute(['id' => $id]);
         $succes = 'Subclassificatie verwijderd.';
+    }
+
+    if ($actie === 'sub_prioriteit_wijzigen') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $prioriteit = $_POST['standaard_prioriteit'] ?? '';
+        $prioriteit = in_array($prioriteit, ['laag','normaal','hoog','kritiek'], true) ? $prioriteit : null;
+        $stmt = $pdo->prepare('UPDATE subclassificaties SET standaard_prioriteit = :p WHERE id = :id');
+        $stmt->execute(['p' => $prioriteit, 'id' => $id]);
+        $succes = 'Standaardprioriteit bijgewerkt.';
     }
 }
 
@@ -124,12 +135,24 @@ include __DIR__ . '/../includes/header.php';
         <?php $subs = $subs_per_hoofd[$h['id']] ?? []; ?>
         <?php if ($subs): ?>
             <table class="admin-table" style="margin-bottom:14px;">
-                <thead><tr><th>Subclassificatie</th><th>Beschrijving</th><th></th></tr></thead>
+                <thead><tr><th>Subclassificatie</th><th>Beschrijving</th><th>Standaardprioriteit</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($subs as $s): ?>
                     <tr>
                         <td><?= e($s['naam']) ?></td>
                         <td style="color:var(--muted);"><?= e($s['beschrijving'] ?: '—') ?></td>
+                        <td>
+                            <form method="post" style="display:inline-flex; align-items:center;">
+                                <input type="hidden" name="actie" value="sub_prioriteit_wijzigen">
+                                <input type="hidden" name="id" value="<?= $s['id'] ?>">
+                                <select name="standaard_prioriteit" onchange="this.form.submit()" style="padding:5px 8px; font-size:12.5px;">
+                                    <option value="">Geen standaard</option>
+                                    <?php foreach (['laag','normaal','hoog','kritiek'] as $p): ?>
+                                        <option value="<?= $p ?>" <?= $s['standaard_prioriteit'] === $p ? 'selected' : '' ?>><?= prioriteit_label($p) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
+                        </td>
                         <td>
                             <form method="post" onsubmit="return confirm('Subclassificatie \'<?= e($s['naam']) ?>\' verwijderen?');">
                                 <input type="hidden" name="actie" value="sub_verwijderen">
@@ -155,6 +178,15 @@ include __DIR__ . '/../includes/header.php';
             <div class="field" style="margin-bottom:0; flex:1; min-width:160px;">
                 <label>Beschrijving (optioneel)</label>
                 <input type="text" name="beschrijving" placeholder="Korte toelichting">
+            </div>
+            <div class="field" style="margin-bottom:0; min-width:150px;">
+                <label>Standaardprioriteit</label>
+                <select name="standaard_prioriteit">
+                    <option value="">Geen standaard</option>
+                    <?php foreach (['laag','normaal','hoog','kritiek'] as $p): ?>
+                        <option value="<?= $p ?>"><?= prioriteit_label($p) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <button type="submit" class="btn">Toevoegen</button>
         </form>
