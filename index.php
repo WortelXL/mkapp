@@ -99,6 +99,15 @@ $kritiek_open   = (int) $pdo->query(
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
 
+// Hoogste ID onder de actieve meldingen, ongeacht filters -- gebruikt om
+// clientside te bepalen of er een nieuwe melding is bijgekomen (voor het
+// geluidssignaal), ook als de huidige filter die melding niet toont.
+$globale_hoogste_id = (int) $pdo->query(
+    "SELECT COALESCE(MAX(id), 0) FROM meldingen WHERE status IN ('open', 'in_behandeling')"
+)->fetchColumn();
+
+$mijn_instellingen = huidige_gebruiker_instellingen($pdo);
+
 $actief = 'dashboard';
 $paginatitel = 'Dashboard';
 include __DIR__ . '/includes/header.php';
@@ -106,7 +115,7 @@ include __DIR__ . '/includes/header.php';
 
 <div class="page-head">
     <div>
-        <p class="eyebrow">Dag <?= bepaal_evenement_dag() ?> van <?= EVENT_AANTAL_DAGEN ?></p>
+        <p class="eyebrow">Dag <?= bepaal_evenement_dag($pdo) ?> van <?= event_aantal_dagen($pdo) ?></p>
         <h1>Overzicht meldingen</h1>
         <p>Actieve meldingen tijdens het evenement. Afgeronde meldingen staan in het <a href="/archief.php" style="color:var(--amber);">archief</a>.</p>
     </div>
@@ -218,5 +227,66 @@ include __DIR__ . '/includes/header.php';
         </a>
     <?php endforeach; ?>
 </div>
+
+<script>
+// Ververst het dashboard automatisch zodat nieuwe meldingen (bv. via de
+// Stream Deck-koppeling aangemaakt) ook zichtbaar worden bij mensen die
+// deze pagina al open hebben staan. Pauzeert zolang iemand aan het typen
+// is in het zoekveld, zodat niemand halverwege een zoekopdracht onderbroken
+// wordt. Actieve filters blijven behouden, want de URL zelf verandert niet.
+// Interval en geluid komen uit de persoonlijke instellingen (/profiel.php).
+(function () {
+    const ververs_seconden = <?= (int) $mijn_instellingen['auto_refresh_seconden'] ?>;
+    const geluid_aan = <?= $mijn_instellingen['geluid_nieuwe_melding'] ? 'true' : 'false' ?>;
+    const globale_hoogste_id = <?= $globale_hoogste_id ?>;
+    const OPSLAG_SLEUTEL = 'meldkamer_laatste_gezien_id';
+
+    let zoekveld_actief = false;
+    const zoekveld = document.querySelector('.filters input[name="q"]');
+    if (zoekveld) {
+        zoekveld.addEventListener('focus', function () { zoekveld_actief = true; });
+        zoekveld.addEventListener('blur', function () { zoekveld_actief = false; });
+    }
+
+    // Geluidje bij een nieuwe melding: vergelijkt het hoogste ID met wat we
+    // de vorige keer in deze browser hebben gezien (localStorage, dus puur
+    // clientside -- geen serveraanroep nodig).
+    function speel_meldingsgeluid() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            [880, 660].forEach(function (freq, i) {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.25);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(ctx.currentTime + i * 0.15);
+                osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+            });
+        } catch (e) {
+            // Geluid kan geblokkeerd zijn door de browser (autoplay-beleid);
+            // negeer dat dan stil, de melding zelf is al zichtbaar.
+        }
+    }
+
+    if (geluid_aan) {
+        const opgeslagen = localStorage.getItem(OPSLAG_SLEUTEL);
+        if (opgeslagen !== null && globale_hoogste_id > parseInt(opgeslagen, 10)) {
+            speel_meldingsgeluid();
+        }
+    }
+    localStorage.setItem(OPSLAG_SLEUTEL, String(globale_hoogste_id));
+
+    if (ververs_seconden > 0) {
+        setInterval(function () {
+            if (!zoekveld_actief && document.visibilityState === 'visible') {
+                window.location.reload();
+            }
+        }, ververs_seconden * 1000);
+    }
+})();
+</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

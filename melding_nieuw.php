@@ -57,7 +57,7 @@ include __DIR__ . '/includes/header.php';
 
 <div class="page-head">
     <div>
-        <p class="eyebrow">Dag <?= bepaal_evenement_dag() ?></p>
+        <p class="eyebrow">Dag <?= bepaal_evenement_dag($pdo) ?></p>
         <h1>Nieuwe melding</h1>
         <p>Volgend meld-ID: <strong style="font-family: var(--font-mono); color: var(--amber);"><?= e(genereer_meld_id($pdo)) ?></strong></p>
     </div>

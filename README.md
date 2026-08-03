@@ -161,6 +161,73 @@ gewoon bestaan, maar verliezen de koppeling.
   - **Protocollen** aanmaken, bewerken en verwijderen — deze protocollen
     zijn het wat er op de melddetailpagina gekoppeld kan worden.
 
+## API: meldingen aanmaken vanaf een Stream Deck of andere koppeling
+
+Naast de webinterface is er een eenvoudige API om meldingen aan te maken
+zonder in te loggen — bedoeld voor een Stream Deck-knop, een script, of
+een andere externe koppeling.
+
+**1. Token aanmaken.** Ga als beheerder naar **Beheer &rarr; Gebruikers**
+en klik bij de betreffende gebruiker op "Token genereren". Het token
+identificeert die gebruiker (zo zie je later wie/welke knop een melding
+heeft aangemaakt) en werkt als een wachtwoord — behandel het ook zo.
+
+**2. Aanroepen.** `POST` naar `/api/melding.php` met het token in de
+header (`Authorization: Bearer <token>`) of als veld `token` in de body
+(handig als je plugin geen custom headers ondersteunt), plus minimaal een
+`titel`:
+
+```bash
+curl -X POST https://jouw-domein/api/melding.php \
+  -H "Authorization: Bearer <token>" \
+  -d "titel=Persoon onwel bij hoofdpodium" \
+  -d "classificatie=reanimatie" \
+  -d "locatie=Podium 1"
+```
+
+Beschikbare velden:
+
+| Veld            | Verplicht | Omschrijving |
+|-----------------|-----------|--------------|
+| `titel`         | Ja        | Korte omschrijving van de melding |
+| `classificatie` | Nee       | Naam van een hoofd- of subclassificatie (bv. `medisch` of `reanimatie`) — wordt op dezelfde manier herkend als het zoekcommando op het dashboard |
+| `prioriteit`    | Nee       | `laag` / `normaal` / `hoog` / `kritiek`. Ontbreekt dit, dan wordt de standaardprioriteit van de gevonden subclassificatie gebruikt, anders `normaal` |
+| `locatie`       | Nee       | |
+| `omschrijving`  | Nee       | |
+| `gemeld_door`   | Nee       | Standaard "Stream Deck (naam gebruiker)" |
+
+Bij succes antwoordt de API met `201` en JSON: `{"success": true, "id": 42, "meld_id": "MK-D2-014"}`.
+Bij een fout (bv. ontbrekende titel, ongeldig token): een 4xx-status met
+`{"success": false, "error": "..."}`.
+
+**3. Stream Deck instellen.** Gebruik de ingebouwde "Website"-actie (of de
+"System: Website"-actie uit de Stream Deck-software) op een knop, stel als
+methode `POST` in, vul de URL, header en velden hierboven in. Voor meerdere
+scenario's (bv. "Medisch kritiek" / "Beveiliging vermist persoon") maak je
+gewoon meerdere knoppen met een net iets andere combinatie van `titel`,
+`classificatie` en `prioriteit`.
+
+**Nieuwe meldingen zichtbaar voor anderen.** Het dashboard ververst
+zichzelf automatisch (interval instelbaar per gebruiker, zie hieronder),
+zodat een melding die via de API of door een collega wordt aangemaakt
+vanzelf verschijnt bij iedereen die het dashboard open heeft staan —
+niemand hoeft handmatig te verversen.
+
+## Persoonlijke instellingen
+
+Elke gebruiker heeft een eigen instellingenpagina, bereikbaar door op de
+eigen naam te klikken rechtsboven in de balk (`/profiel.php`):
+
+- **Automatisch verversen elke ...** — interval voor het dashboard en de
+  melddetailpagina (uit, 10/15/20/30/60 seconden). Pauzeert altijd vanzelf
+  zolang iemand aan het typen is, ongeacht deze instelling.
+- **Geluid bij een nieuwe melding** — aan/uit. Werkt alleen zolang het
+  dashboard open staat in de browser; sommige browsers blokkeren geluid
+  totdat er ergens op de pagina is geklikt (browserbeveiliging tegen
+  autoplay, geen bug).
+
+Deze instellingen zijn per account en beïnvloeden niemand anders.
+
 ## Beveiliging & aanpassingen
 
 - Wachtwoorden worden gehasht opgeslagen (`password_hash`), er wordt geen

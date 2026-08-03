@@ -4,6 +4,15 @@
 -- voordat je de applicatie voor het eerst gebruikt.
 -- ============================================================
 
+-- Algemene, via het beheerpaneel aanpasbare instellingen (evenementnaam,
+-- startdatum, aantal dagen). Ontbreekt een sleutel hier, dan valt de
+-- applicatie terug op de waarde uit config.php.
+CREATE TABLE IF NOT EXISTS instellingen (
+    sleutel VARCHAR(50) PRIMARY KEY,
+    waarde VARCHAR(255) NOT NULL,
+    bijgewerkt_op DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS gebruikers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gebruikersnaam VARCHAR(50) NOT NULL UNIQUE,
@@ -11,6 +20,9 @@ CREATE TABLE IF NOT EXISTS gebruikers (
     naam VARCHAR(100) NOT NULL,
     rol ENUM('beheerder','medewerker') NOT NULL DEFAULT 'medewerker',
     actief TINYINT(1) NOT NULL DEFAULT 1,
+    api_token VARCHAR(64) DEFAULT NULL UNIQUE,
+    auto_refresh_seconden INT NOT NULL DEFAULT 20,
+    geluid_nieuwe_melding TINYINT(1) NOT NULL DEFAULT 1,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

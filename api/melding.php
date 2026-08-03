@@ -1,0 +1,127 @@
+<?php
+/**
+ * API-endpoint om een melding aan te maken zonder in te loggen, bedoeld
+ * voor koppelingen zoals een Stream Deck-knop.
+ *
+ * Aanroep: POST /api/melding.php
+ * Authenticatie: header "Authorization: Bearer <token>", of een veld
+ *                "token" in de POST-body (handig voor plugins die geen
+ *                custom headers ondersteunen).
+ *
+ * Velden (form-data of x-www-form-urlencoded):
+ *   titel          (verplicht)
+ *   classificatie  (optioneel) - naam van een hoofd- of subclassificatie,
+ *                    bv. "medisch" of "reanimatie". Wordt op dezelfde manier
+ *                    herkend als het zoekcommando op het dashboard.
+ *   prioriteit     (optioneel) - laag/normaal/hoog/kritiek. Ontbreekt dit,
+ *                    dan wordt de standaardprioriteit van de gevonden
+ *                    subclassificatie gebruikt, anders "normaal".
+ *   locatie        (optioneel)
+ *   omschrijving   (optioneel)
+ *   gemeld_door    (optioneel)
+ *
+ * Antwoord (JSON): {"success": true, "id": 42, "meld_id": "MK-D2-014"}
+ */
+
+require_once __DIR__ . '/../includes/functions.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+function api_antwoord(int $status, array $data): void
+{
+    http_response_code($status);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    api_antwoord(405, ['success' => false, 'error' => 'Alleen POST-verzoeken worden ondersteund.']);
+}
+
+$pdo = get_pdo();
+
+// ---- Token ophalen: header of body -------------------------------------
+$token = '';
+$headers = function_exists('getallheaders') ? getallheaders() : [];
+foreach ($headers as $naam => $waarde) {
+    if (strtolower($naam) === 'authorization' && stripos($waarde, 'Bearer ') === 0) {
+        $token = trim(substr($waarde, 7));
+    }
+}
+if ($token === '') {
+    $token = trim($_POST['token'] ?? $_GET['token'] ?? '');
+}
+
+if ($token === '') {
+    api_antwoord(401, ['success' => false, 'error' => 'Geen API-token opgegeven.']);
+}
+
+$stmt = $pdo->prepare('SELECT * FROM gebruikers WHERE api_token = :t');
+$stmt->execute(['t' => $token]);
+$gebruiker = $stmt->fetch();
+
+if (!$gebruiker || !$gebruiker['actief']) {
+    api_antwoord(401, ['success' => false, 'error' => 'Ongeldig of inactief API-token.']);
+}
+
+// ---- Velden -------------------------------------------------------------
+$titel = trim($_POST['titel'] ?? '');
+if ($titel === '') {
+    api_antwoord(422, ['success' => false, 'error' => 'Veld "titel" is verplicht.']);
+}
+
+$omschrijving        = trim($_POST['omschrijving'] ?? '');
+$locatie             = trim($_POST['locatie'] ?? '');
+$gemeld_door         = trim($_POST['gemeld_door'] ?? '');
+$classificatie_tekst = trim($_POST['classificatie'] ?? '');
+$prioriteit_input    = trim($_POST['prioriteit'] ?? '');
+
+$hoofd_id = null;
+$sub_id = null;
+$standaard_prioriteit = null;
+
+if ($classificatie_tekst !== '') {
+    $gevonden = vind_classificatie_commando($pdo, $classificatie_tekst);
+    if ($gevonden) {
+        $hoofd_id = $gevonden['hoofd_id'];
+        $sub_id   = $gevonden['sub_id'] ?? null;
+        if ($sub_id) {
+            $prio_stmt = $pdo->prepare('SELECT standaard_prioriteit FROM subclassificaties WHERE id = :id');
+            $prio_stmt->execute(['id' => $sub_id]);
+            $standaard_prioriteit = $prio_stmt->fetchColumn() ?: null;
+        }
+    }
+}
+
+$geldige_prioriteiten = ['laag', 'normaal', 'hoog', 'kritiek'];
+if (in_array($prioriteit_input, $geldige_prioriteiten, true)) {
+    $prioriteit = $prioriteit_input;
+} elseif ($standaard_prioriteit) {
+    $prioriteit = $standaard_prioriteit;
+} else {
+    $prioriteit = 'normaal';
+}
+
+// ---- Melding aanmaken -----------------------------------------------------
+$meld_id = genereer_meld_id($pdo);
+$stmt = $pdo->prepare(
+    'INSERT INTO meldingen (meld_id, titel, omschrijving, hoofdclassificatie_id, subclassificatie_id, locatie, prioriteit, gemeld_door, aangemaakt_door_id)
+     VALUES (:meld_id, :titel, :omschrijving, :hoofd, :sub, :locatie, :prioriteit, :gemeld_door, :gebruiker)'
+);
+$stmt->execute([
+    'meld_id'      => $meld_id,
+    'titel'        => $titel,
+    'omschrijving' => $omschrijving ?: null,
+    'hoofd'        => $hoofd_id,
+    'sub'          => $sub_id,
+    'locatie'      => $locatie ?: null,
+    'prioriteit'   => $prioriteit,
+    'gemeld_door'  => $gemeld_door ?: ('Stream Deck (' . $gebruiker['naam'] . ')'),
+    'gebruiker'    => $gebruiker['id'],
+]);
+
+api_antwoord(201, [
+    'success' => true,
+    'id'      => (int) $pdo->lastInsertId(),
+    'meld_id' => $meld_id,
+]);

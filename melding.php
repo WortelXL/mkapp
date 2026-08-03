@@ -167,6 +167,8 @@ $notities_stmt = $pdo->prepare('SELECT * FROM melding_notities WHERE melding_id 
 $notities_stmt->execute(['id' => $id]);
 $notities = $notities_stmt->fetchAll();
 
+$mijn_instellingen = huidige_gebruiker_instellingen($pdo);
+
 $actief = 'dashboard';
 $paginatitel = $melding['meld_id'];
 include __DIR__ . '/includes/header.php';
@@ -388,6 +390,33 @@ function vulSubclassificaties2() {
 
 hoofdSelect2.addEventListener('change', vulSubclassificaties2);
 vulSubclassificaties2();
+
+// Ververst deze melding automatisch zodat wijzigingen van collega's
+// (status, notities, subtaken, etc.) live zichtbaar worden bij iedereen
+// die deze melding open heeft staan. Pauzeert zolang iemand aan het typen
+// is in een tekstveld, textarea, of terwijl er tekst geselecteerd is
+// (bv. om te kopieren), zodat niemand onderbroken wordt. Interval komt uit
+// de persoonlijke instellingen (/profiel.php); op "Uit" gebeurt er niets.
+(function () {
+    const ververs_seconden = <?= (int) $mijn_instellingen['auto_refresh_seconden'] ?>;
+    if (ververs_seconden <= 0) {
+        return;
+    }
+
+    let veld_actief = false;
+
+    document.querySelectorAll('input[type="text"], textarea').forEach(function (veld) {
+        veld.addEventListener('focus', function () { veld_actief = true; });
+        veld.addEventListener('blur', function () { veld_actief = false; });
+    });
+
+    setInterval(function () {
+        const heeft_selectie = (window.getSelection() || '').toString().length > 0;
+        if (!veld_actief && !heeft_selectie && document.visibilityState === 'visible') {
+            window.location.reload();
+        }
+    }, ververs_seconden * 1000);
+})();
 </script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

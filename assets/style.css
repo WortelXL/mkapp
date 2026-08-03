@@ -123,7 +123,11 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
     padding: 6px 4px 6px 12px;
     margin-left: 4px;
     border-left: 1px solid var(--border);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: color 0.15s;
 }
+.user-chip:hover { color: var(--text); }
 
 .rol-badge {
     font-family: var(--font-mono);

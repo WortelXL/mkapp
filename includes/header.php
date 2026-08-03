@@ -4,7 +4,7 @@
  * Verwacht optioneel: $paginatitel (string)
  */
 $actief = $actief ?? '';
-$paginatitel = $paginatitel ?? EVENT_NAAM;
+$paginatitel = $paginatitel ?? event_naam($pdo);
 ?>
 <!doctype html>
 <html lang="nl">
@@ -21,7 +21,7 @@ $paginatitel = $paginatitel ?? EVENT_NAAM;
             <span class="brand-mark">MK</span>
             <span>
                 <span class="brand-name">Meldkamer</span><br>
-                <span class="brand-event"><?= e(EVENT_NAAM) ?></span>
+                <span class="brand-event"><?= e(event_naam($pdo)) ?></span>
             </span>
         </a>
         <nav class="mainnav">
@@ -32,10 +32,10 @@ $paginatitel = $paginatitel ?? EVENT_NAAM;
                 <?php if (is_beheerder()): ?>
                     <a href="/admin/index.php" class="<?= $actief === 'admin' ? 'active' : '' ?>">Beheer</a>
                 <?php endif; ?>
-                <span class="user-chip">
+                <a href="/profiel.php" class="user-chip">
                     <?= e(huidige_gebruiker_naam()) ?>
                     <span class="rol-badge rol-<?= e(huidige_gebruiker_rol()) ?>"><?= e(rol_label(huidige_gebruiker_rol())) ?></span>
-                </span>
+                </a>
                 <a href="/admin/logout.php">Uitloggen</a>
             <?php else: ?>
                 <a href="/admin/login.php" class="<?= $actief === 'login' ? 'active' : '' ?>">Inloggen</a>

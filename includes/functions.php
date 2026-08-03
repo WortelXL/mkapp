@@ -7,18 +7,62 @@ function e(?string $value): string
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Instellingen (evenementnaam, startdatum, aantal dagen) staan in de
+ * databasetabel 'instellingen' en zijn aanpasbaar via Beheer -> Instellingen.
+ * Ontbreekt een sleutel (bv. bij een verse installatie), dan valt de
+ * applicatie terug op de waarde uit config.php.
+ */
+function get_instelling(PDO $pdo, string $sleutel, string $standaard = ''): string
+{
+    static $cache = [];
+    if (array_key_exists($sleutel, $cache)) {
+        return $cache[$sleutel];
+    }
+    $stmt = $pdo->prepare('SELECT waarde FROM instellingen WHERE sleutel = :s');
+    $stmt->execute(['s' => $sleutel]);
+    $waarde = $stmt->fetchColumn();
+    $cache[$sleutel] = $waarde !== false && $waarde !== '' ? $waarde : $standaard;
+    return $cache[$sleutel];
+}
+
+function set_instelling(PDO $pdo, string $sleutel, string $waarde): void
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO instellingen (sleutel, waarde) VALUES (:s, :w)
+         ON DUPLICATE KEY UPDATE waarde = VALUES(waarde)'
+    );
+    $stmt->execute(['s' => $sleutel, 'w' => $waarde]);
+}
+
+function event_naam(PDO $pdo): string
+{
+    return get_instelling($pdo, 'event_naam', EVENT_NAAM);
+}
+
+function event_start_datum(PDO $pdo): string
+{
+    return get_instelling($pdo, 'event_start_datum', EVENT_START_DATUM);
+}
+
+function event_aantal_dagen(PDO $pdo): int
+{
+    return (int) get_instelling($pdo, 'event_aantal_dagen', (string) EVENT_AANTAL_DAGEN);
+}
+
 /** Bepaalt op welke festivaldag (1, 2, 3...) een tijdstip valt */
-function bepaal_evenement_dag(?DateTime $moment = null): int
+function bepaal_evenement_dag(PDO $pdo, ?DateTime $moment = null): int
 {
     $moment = $moment ?? new DateTime();
-    $start  = new DateTime(EVENT_START_DATUM);
+    $start  = new DateTime(event_start_datum($pdo));
+    $totaal = event_aantal_dagen($pdo);
     $diff   = (int) $start->diff($moment)->format('%r%a');
     $dag    = $diff + 1;
     if ($dag < 1) {
         $dag = 1;
     }
-    if ($dag > EVENT_AANTAL_DAGEN) {
-        $dag = EVENT_AANTAL_DAGEN;
+    if ($dag > $totaal) {
+        $dag = $totaal;
     }
     return $dag;
 }
@@ -26,7 +70,7 @@ function bepaal_evenement_dag(?DateTime $moment = null): int
 /** Genereert een uniek, oplopend meld-ID zoals MK-D2-014 */
 function genereer_meld_id(PDO $pdo): string
 {
-    $dag    = bepaal_evenement_dag();
+    $dag    = bepaal_evenement_dag($pdo);
     $prefix = sprintf('MK-D%d-', $dag);
 
     $stmt = $pdo->prepare(
@@ -261,4 +305,23 @@ function rol_label(string $rol): string
         'beheerder'  => 'Beheerder',
         'medewerker' => 'Medewerker',
     ][$rol] ?? $rol;
+}
+
+/** Genereert een nieuw, willekeurig API-token voor Stream Deck / externe koppelingen */
+function genereer_api_token(): string
+{
+    return bin2hex(random_bytes(20));
+}
+
+/** Haalt de persoonlijke instellingen van de ingelogde gebruiker op (met veilige standaardwaarden) */
+function huidige_gebruiker_instellingen(PDO $pdo): array
+{
+    $standaard = ['auto_refresh_seconden' => 20, 'geluid_nieuwe_melding' => 1];
+    if (empty($_SESSION['gebruiker_id'])) {
+        return $standaard;
+    }
+    $stmt = $pdo->prepare('SELECT auto_refresh_seconden, geluid_nieuwe_melding FROM gebruikers WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['gebruiker_id']]);
+    $rij = $stmt->fetch();
+    return $rij ?: $standaard;
 }

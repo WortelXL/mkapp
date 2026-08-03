@@ -1,4 +1,4 @@
-    <p class="footer-note">Meldkamer systeem — <?= e(EVENT_NAAM) ?></p>
+    <p class="footer-note">Meldkamer systeem — <?= e(event_naam($pdo)) ?></p>
 </div>
 </body>
 </html>

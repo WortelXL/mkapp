@@ -97,6 +97,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $succes = 'Gebruiker verwijderd.';
         }
     }
+
+    if ($actie === 'token_genereren') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $stmt = $pdo->prepare('UPDATE gebruikers SET api_token = :t WHERE id = :id');
+        $stmt->execute(['t' => genereer_api_token(), 'id' => $id]);
+        $succes = 'Nieuw API-token gegenereerd.';
+    }
+
+    if ($actie === 'token_intrekken') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $stmt = $pdo->prepare('UPDATE gebruikers SET api_token = NULL WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $succes = 'API-token ingetrokken.';
+    }
 }
 
 $gebruikers = $pdo->query('SELECT * FROM gebruikers ORDER BY actief DESC, naam ASC')->fetchAll();
@@ -150,7 +164,7 @@ include __DIR__ . '/../includes/header.php';
     <h2>Bestaande gebruikers</h2>
     <table class="admin-table">
         <thead>
-            <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th>Status</th><th></th></tr>
+            <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th>Status</th><th>API-token (Stream Deck e.d.)</th><th></th></tr>
         </thead>
         <tbody>
         <?php foreach ($gebruikers as $g): ?>
@@ -173,6 +187,22 @@ include __DIR__ . '/../includes/header.php';
                     </span>
                 </td>
                 <td style="white-space:nowrap;">
+                    <?php if ($g['api_token']): ?>
+                        <input type="text" readonly value="<?= e($g['api_token']) ?>" onclick="this.select()" style="width:220px; font-family:var(--font-mono); font-size:11.5px; padding:5px 7px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:4px;">
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Token intrekken? Knoppen/koppelingen die dit token gebruiken werken dan niet meer.');">
+                            <input type="hidden" name="actie" value="token_intrekken">
+                            <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                            <button type="submit" class="btn btn-small btn-danger">Intrekken</button>
+                        </form>
+                    <?php else: ?>
+                        <form method="post" style="display:inline;">
+                            <input type="hidden" name="actie" value="token_genereren">
+                            <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                            <button type="submit" class="btn btn-small">Token genereren</button>
+                        </form>
+                    <?php endif; ?>
+                </td>
+                <td style="white-space:nowrap;">
                     <form method="post" style="display:inline;">
                         <input type="hidden" name="actie" value="actief_wisselen">
                         <input type="hidden" name="id" value="<?= $g['id'] ?>">
@@ -188,6 +218,9 @@ include __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
         </tbody>
     </table>
+    <p style="color:var(--muted); font-size:12px; margin:14px 0 0;">
+        Een API-token geeft toegang tot het aanmaken van meldingen via <code>/api/melding.php</code> (bv. vanaf een Stream Deck), zonder in te loggen. Behandel een token als een wachtwoord.
+    </p>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

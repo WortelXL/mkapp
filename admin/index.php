@@ -56,6 +56,11 @@ include __DIR__ . '/../includes/header.php';
         <p style="color:var(--muted); margin-top:-8px;">Beheer standaardprocedures die aan meldingen gekoppeld kunnen worden.</p>
         <a href="/admin/protocollen.php" class="btn btn-primary">Protocollen beheren</a>
     </div>
+    <div class="panel">
+        <h2>Instellingen</h2>
+        <p style="color:var(--muted); margin-top:-8px;">Naam, startdatum en aantal dagen van het evenement.</p>
+        <a href="/admin/instellingen.php" class="btn btn-primary">Instellingen beheren</a>
+    </div>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
