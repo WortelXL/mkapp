@@ -10,9 +10,7 @@ $f_sub        = $_GET['sub'] ?? '';
 $f_prioriteit = $_GET['prioriteit'] ?? '';
 $f_zoek       = trim($_GET['q'] ?? '');
 
-// ---- Commando in de zoekbalk: "-medisch" of "-reanimatie" -----------
-// Vervangt de zoekterm door een echt hoofd-/subclassificatiefilter en
-// ververst de pagina met een schone URL.
+// Commando in de zoekbalk: "-medisch" of "-reanimatie" (zelfde als dashboard)
 $commando_niet_gevonden = null;
 if ($f_zoek !== '' && $f_zoek[0] === '-') {
     $commando = trim(substr($f_zoek, 1));
@@ -29,27 +27,27 @@ if ($f_zoek !== '' && $f_zoek[0] === '-') {
         if ($f_prioriteit !== '') {
             $redirect_params['prioriteit'] = $f_prioriteit;
         }
-        header('Location: /index.php?' . http_build_query($redirect_params));
+        header('Location: /archief.php?' . http_build_query($redirect_params));
         exit;
     }
 
-    // Geen classificatie gevonden voor dit commando: laat het zien, en
-    // val terug op een gewone tekstzoekopdracht zonder het streepje.
     $commando_niet_gevonden = $commando;
     $f_zoek = $commando;
 }
 
-// Dashboard toont alleen actieve meldingen (afgehandeld/geannuleerd staan
-// vanaf nu in het archief, zie /archief.php) — status-filter is dus beperkt
-// tot de 2 actieve statussen.
-if ($f_status === 'open' || $f_status === 'in_behandeling') {
-    $where  = ['m.status = :status'];
-    $params = ['status' => $f_status];
+// Archief = alleen afgeronde meldingen (afgehandeld of geannuleerd),
+// tenzij er specifiek op 1 van de twee gefilterd wordt.
+if ($f_status === 'afgehandeld' || $f_status === 'geannuleerd') {
+    $status_conditie = 'm.status = :status';
+    $status_params = ['status' => $f_status];
 } else {
     $f_status = '';
-    $where  = ["m.status IN ('open', 'in_behandeling')"];
-    $params = [];
+    $status_conditie = "m.status IN ('afgehandeld', 'geannuleerd')";
+    $status_params = [];
 }
+
+$where  = [$status_conditie];
+$params = $status_params;
 
 if ($f_hoofd !== '' && ctype_digit($f_hoofd)) {
     $where[] = 'm.hoofdclassificatie_id = :hoofd';
@@ -68,6 +66,8 @@ if ($f_zoek !== '') {
     $params['zoek'] = '%' . $f_zoek . '%';
 }
 
+$MAX_RESULTATEN = 150;
+
 $sql = "SELECT m.*,
                h.naam AS hoofd_naam, h.kleur AS hoofd_kleur,
                s.naam AS sub_naam,
@@ -75,61 +75,43 @@ $sql = "SELECT m.*,
         FROM meldingen m
         LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
         LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
-        LEFT JOIN gebruikers g ON g.id = m.aangemaakt_door_id";
-if ($where) {
-    $sql .= ' WHERE ' . implode(' AND ', $where);
-}
-$sql .= ' ORDER BY FIELD(m.prioriteit,"kritiek","hoog","normaal","laag"), m.aangemaakt_op DESC';
+        LEFT JOIN gebruikers g ON g.id = m.aangemaakt_door_id
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY m.bijgewerkt_op DESC
+        LIMIT $MAX_RESULTATEN";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $meldingen = $stmt->fetchAll();
 
-// ---- Statusbord (tellingen) -------------------------------------------
-$tellingen = $pdo->query(
-    "SELECT status, COUNT(*) AS aantal FROM meldingen GROUP BY status"
-)->fetchAll(PDO::FETCH_KEY_PAIR);
-
-$open           = $tellingen['open'] ?? 0;
-$in_behandeling = $tellingen['in_behandeling'] ?? 0;
-$afgehandeld    = $tellingen['afgehandeld'] ?? 0;
-$kritiek_open   = (int) $pdo->query(
-    "SELECT COUNT(*) FROM meldingen WHERE prioriteit='kritiek' AND status NOT IN ('afgehandeld','geannuleerd')"
-)->fetchColumn();
+// ---- Tellingen ----------------------------------------------------------
+$totaal_afgehandeld = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'afgehandeld'")->fetchColumn();
+$totaal_geannuleerd = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'geannuleerd'")->fetchColumn();
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
 
-$actief = 'dashboard';
-$paginatitel = 'Dashboard';
+$actief = 'archief';
+$paginatitel = 'Archief';
 include __DIR__ . '/includes/header.php';
 ?>
 
 <div class="page-head">
     <div>
-        <p class="eyebrow">Dag <?= bepaal_evenement_dag() ?> van <?= EVENT_AANTAL_DAGEN ?></p>
-        <h1>Overzicht meldingen</h1>
-        <p>Actieve meldingen tijdens het evenement. Afgeronde meldingen staan in het <a href="/archief.php" style="color:var(--amber);">archief</a>.</p>
+        <p class="eyebrow">Archief</p>
+        <h1>Afgeronde meldingen</h1>
+        <p>Overzicht van alle afgehandelde en geannuleerde meldingen.</p>
     </div>
-    <a href="/melding_nieuw.php" class="btn btn-primary">+ Nieuwe melding</a>
 </div>
 
 <div class="board">
-    <div class="board-cell <?= $kritiek_open > 0 ? 'pulse' : '' ?>">
-        <div class="num c-red"><?= $kritiek_open ?></div>
-        <div class="lbl">Kritiek &amp; open</div>
+    <div class="board-cell">
+        <div class="num c-green"><?= $totaal_afgehandeld ?></div>
+        <div class="lbl">Afgehandeld</div>
     </div>
     <div class="board-cell">
-        <div class="num c-red"><?= $open ?></div>
-        <div class="lbl">Open</div>
+        <div class="num c-muted"><?= $totaal_geannuleerd ?></div>
+        <div class="lbl">Geannuleerd</div>
     </div>
-    <div class="board-cell">
-        <div class="num c-amber"><?= $in_behandeling ?></div>
-        <div class="lbl">In behandeling</div>
-    </div>
-    <a href="/archief.php" class="board-cell" style="text-decoration:none; color:inherit; display:block;">
-        <div class="num c-green"><?= $afgehandeld ?></div>
-        <div class="lbl">Afgehandeld &rarr; archief</div>
-    </a>
 </div>
 
 <?php if (isset($_GET['via']) && $_GET['via'] === 'commando' && $f_hoofd): ?>
@@ -162,10 +144,9 @@ include __DIR__ . '/includes/header.php';
 <form class="filters" method="get">
     <input type="text" name="q" placeholder="Zoek, of typ -classificatienaam..." value="<?= e($f_zoek) ?>">
     <select name="status">
-        <option value="">Open + in behandeling</option>
-        <?php foreach (['open','in_behandeling'] as $s): ?>
-            <option value="<?= $s ?>" <?= $f_status === $s ? 'selected' : '' ?>>Alleen <?= lcfirst(status_label($s)) ?></option>
-        <?php endforeach; ?>
+        <option value="">Afgehandeld + geannuleerd</option>
+        <option value="afgehandeld" <?= $f_status === 'afgehandeld' ? 'selected' : '' ?>>Alleen afgehandeld</option>
+        <option value="geannuleerd" <?= $f_status === 'geannuleerd' ? 'selected' : '' ?>>Alleen geannuleerd</option>
     </select>
     <select name="prioriteit">
         <option value="">Alle prioriteiten</option>
@@ -184,13 +165,13 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
     <button type="submit" class="btn btn-small">Filteren</button>
     <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek): ?>
-        <a href="/index.php" class="btn btn-small">Wissen</a>
+        <a href="/archief.php" class="btn btn-small">Wissen</a>
     <?php endif; ?>
 </form>
 
 <div class="melding-list">
     <?php if (!$meldingen): ?>
-        <div class="empty">Geen meldingen gevonden. Pas de filters aan of maak een nieuwe melding aan.</div>
+        <div class="empty">Geen afgeronde meldingen gevonden. Pas de filters aan.</div>
     <?php endif; ?>
 
     <?php foreach ($meldingen as $m): ?>
@@ -200,7 +181,7 @@ include __DIR__ . '/includes/header.php';
                 <span class="titel"><?= e($m['titel']) ?></span>
                 <span class="meta">
                     <?= e($m['locatie'] ?: 'Geen locatie opgegeven') ?>
-                    · <?= (new DateTime($m['aangemaakt_op']))->format('d-m H:i') ?>
+                    · afgerond <?= (new DateTime($m['bijgewerkt_op']))->format('d-m H:i') ?>
                     · ingevoerd door <?= e($m['aangemaakt_door_naam'] ?: 'onbekend') ?>
                 </span>
             </span>
@@ -217,6 +198,12 @@ include __DIR__ . '/includes/header.php';
             </span>
         </a>
     <?php endforeach; ?>
+
+    <?php if (count($meldingen) === $MAX_RESULTATEN): ?>
+        <p style="color: var(--muted); font-size: 12.5px; text-align:center; margin-top: 8px;">
+            Toont de meest recente <?= $MAX_RESULTATEN ?> resultaten. Verfijn de filters voor een specifieker overzicht.
+        </p>
+    <?php endif; ?>
 </div>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

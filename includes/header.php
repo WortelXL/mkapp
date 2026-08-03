@@ -28,6 +28,7 @@ $paginatitel = $paginatitel ?? EVENT_NAAM;
             <?php if (is_ingelogd()): ?>
                 <a href="/index.php" class="<?= $actief === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
                 <a href="/melding_nieuw.php" class="<?= $actief === 'nieuw' ? 'active' : '' ?>">Nieuwe melding</a>
+                <a href="/archief.php" class="<?= $actief === 'archief' ? 'active' : '' ?>">Archief</a>
                 <?php if (is_beheerder()): ?>
                     <a href="/admin/index.php" class="<?= $actief === 'admin' ? 'active' : '' ?>">Beheer</a>
                 <?php endif; ?>
