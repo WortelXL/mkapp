@@ -13,22 +13,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($actie === 'opslaan') {
         $id           = (int) ($_POST['id'] ?? 0);
         $titel        = trim($_POST['titel'] ?? '');
-        $hoofdclassificatie_id = $_POST['hoofdclassificatie_id'] !== '' ? (int) $_POST['hoofdclassificatie_id'] : null;
+        $subclassificatie_id = $_POST['subclassificatie_id'] !== '' ? (int) $_POST['subclassificatie_id'] : null;
         $inhoud       = trim($_POST['inhoud'] ?? '');
 
         if ($titel === '' || $inhoud === '') {
             $fout = 'Vul zowel een titel als de inhoud van het protocol in.';
         } elseif ($id > 0) {
             $stmt = $pdo->prepare(
-                'UPDATE protocollen SET titel = :t, hoofdclassificatie_id = :c, inhoud = :i WHERE id = :id'
+                'UPDATE protocollen SET titel = :t, subclassificatie_id = :c, inhoud = :i WHERE id = :id'
             );
-            $stmt->execute(['t' => $titel, 'c' => $hoofdclassificatie_id, 'i' => $inhoud, 'id' => $id]);
+            $stmt->execute(['t' => $titel, 'c' => $subclassificatie_id, 'i' => $inhoud, 'id' => $id]);
             $succes = 'Protocol bijgewerkt.';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO protocollen (titel, hoofdclassificatie_id, inhoud) VALUES (:t, :c, :i)'
+                'INSERT INTO protocollen (titel, subclassificatie_id, inhoud) VALUES (:t, :c, :i)'
             );
-            $stmt->execute(['t' => $titel, 'c' => $hoofdclassificatie_id, 'i' => $inhoud]);
+            $stmt->execute(['t' => $titel, 'c' => $subclassificatie_id, 'i' => $inhoud]);
             $succes = 'Protocol aangemaakt.';
         }
     }
@@ -38,6 +38,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare('DELETE FROM protocollen WHERE id = :id');
         $stmt->execute(['id' => $id]);
         $succes = 'Protocol verwijderd.';
+    }
+
+    if ($actie === 'subtaak_aanmaken') {
+        $protocol_id  = (int) ($_POST['protocol_id'] ?? 0);
+        $omschrijving = trim($_POST['omschrijving'] ?? '');
+        if ($protocol_id <= 0 || $omschrijving === '') {
+            $fout = 'Vul een omschrijving voor de subtaak in.';
+        } else {
+            $stmt = $pdo->prepare('SELECT COALESCE(MAX(volgorde), 0) + 1 FROM protocol_subtaken WHERE protocol_id = :p');
+            $stmt->execute(['p' => $protocol_id]);
+            $volgende_volgorde = (int) $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO protocol_subtaken (protocol_id, omschrijving, volgorde) VALUES (:p, :o, :v)'
+            );
+            $stmt->execute(['p' => $protocol_id, 'o' => $omschrijving, 'v' => $volgende_volgorde]);
+            $succes = 'Subtaak toegevoegd.';
+        }
+    }
+
+    if ($actie === 'subtaak_verwijderen') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $stmt = $pdo->prepare('DELETE FROM protocol_subtaken WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $succes = 'Subtaak verwijderd.';
     }
 }
 
@@ -49,6 +74,7 @@ if (isset($_GET['bewerk'])) {
 
 $protocollen = get_protocollen($pdo);
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
+$subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
 
 $actief = 'admin';
 $paginatitel = 'Protocollen beheren';
@@ -76,13 +102,23 @@ include __DIR__ . '/../includes/header.php';
             <input type="text" id="titel" name="titel" required value="<?= e($bewerk['titel'] ?? '') ?>" placeholder="bv. Protocol vermist kind">
         </div>
         <div class="field full">
-            <label for="hoofdclassificatie_id">Gekoppelde hoofdclassificatie (optioneel)</label>
-            <select id="hoofdclassificatie_id" name="hoofdclassificatie_id">
-                <option value="">Geen specifieke hoofdclassificatie</option>
+            <label for="subclassificatie_id">Gekoppelde subclassificatie (optioneel)</label>
+            <select id="subclassificatie_id" name="subclassificatie_id">
+                <option value="">Geen specifieke subclassificatie</option>
                 <?php foreach ($hoofdclassificaties as $h): ?>
-                    <option value="<?= $h['id'] ?>" <?= (($bewerk['hoofdclassificatie_id'] ?? null) == $h['id']) ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
+                    <?php $subs = $subs_per_hoofd[$h['id']] ?? []; ?>
+                    <?php if ($subs): ?>
+                        <optgroup label="<?= e($h['naam']) ?>">
+                            <?php foreach ($subs as $s): ?>
+                                <option value="<?= $s['id'] ?>" <?= (($bewerk['subclassificatie_id'] ?? null) == $s['id']) ? 'selected' : '' ?>><?= e($s['naam']) ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
                 <?php endforeach; ?>
             </select>
+            <?php if (!array_filter($subs_per_hoofd)): ?>
+                <p style="color:var(--muted); font-size:12px; margin:6px 0 0;">Er zijn nog geen subclassificaties aangemaakt. Ga naar <a href="/admin/classificaties.php" style="color:var(--amber);">Beheer &rarr; Classificaties</a> om er een toe te voegen.</p>
+            <?php endif; ?>
         </div>
         <div class="field full">
             <label for="inhoud">Inhoud / stappen</label>
@@ -115,7 +151,39 @@ include __DIR__ . '/../includes/header.php';
                     </form>
                 </div>
             </div>
+            <?php if ($p['sub_naam']): ?>
+                <p class="cat-chip" style="display:inline-block; background: <?= e($p['hoofd_kleur']) ?>22; color: <?= e($p['hoofd_kleur']) ?>; margin: 0 0 8px;">
+                    <?= e($p['hoofd_naam']) ?> &middot; <?= e($p['sub_naam']) ?>
+                </p>
+            <?php endif; ?>
             <p><?= e($p['inhoud']) ?></p>
+
+            <?php $subtaken = get_subtaken($pdo, $p['id']); ?>
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+                <p style="font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 8px;">Subtaken</p>
+                <?php if (!$subtaken): ?>
+                    <p style="color:var(--muted); font-size:13px; margin:0 0 8px;">Nog geen subtaken voor dit protocol.</p>
+                <?php else: ?>
+                    <ul style="margin:0 0 10px; padding-left:18px;">
+                        <?php foreach ($subtaken as $t): ?>
+                            <li style="font-size:13.5px; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                                <span style="flex:1;"><?= e($t['omschrijving']) ?></span>
+                                <form method="post" onsubmit="return confirm('Subtaak verwijderen?');">
+                                    <input type="hidden" name="actie" value="subtaak_verwijderen">
+                                    <input type="hidden" name="id" value="<?= $t['id'] ?>">
+                                    <button type="submit" class="btn btn-small btn-danger">Verwijderen</button>
+                                </form>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+                <form method="post" style="display:flex; gap:8px;">
+                    <input type="hidden" name="actie" value="subtaak_aanmaken">
+                    <input type="hidden" name="protocol_id" value="<?= $p['id'] ?>">
+                    <input type="text" name="omschrijving" placeholder="Nieuwe subtaak, bv. 'AED gehaald'" style="flex:1;" required>
+                    <button type="submit" class="btn btn-small">Toevoegen</button>
+                </form>
+            </div>
         </div>
     <?php endforeach; ?>
 </div>

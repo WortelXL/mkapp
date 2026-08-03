@@ -93,6 +93,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($actie === 'subtaak_wisselen') {
+        $subtaak_id = (int) ($_POST['subtaak_id'] ?? 0);
+        if ($subtaak_id > 0) {
+            $huidige_stmt = $pdo->prepare(
+                'SELECT afgevinkt FROM melding_subtaak_status WHERE melding_id = :m AND subtaak_id = :s'
+            );
+            $huidige_stmt->execute(['m' => $id, 's' => $subtaak_id]);
+            $huidig = (int) $huidige_stmt->fetchColumn();
+            $nieuw = $huidig ? 0 : 1;
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO melding_subtaak_status (melding_id, subtaak_id, afgevinkt, afgevinkt_door_id, afgevinkt_op)
+                 VALUES (:m, :s, :a, :g, :t)
+                 ON DUPLICATE KEY UPDATE afgevinkt = VALUES(afgevinkt), afgevinkt_door_id = VALUES(afgevinkt_door_id), afgevinkt_op = VALUES(afgevinkt_op)'
+            );
+            $stmt->execute([
+                'm' => $id,
+                's' => $subtaak_id,
+                'a' => $nieuw,
+                'g' => $nieuw ? $_SESSION['gebruiker_id'] : null,
+                't' => $nieuw ? date('Y-m-d H:i:s') : null,
+            ]);
+        }
+        header('Location: /melding.php?id=' . $id . '#protocollen');
+        exit;
+    }
+
     if ($actie === 'notitie_toevoegen') {
         $notitie = trim($_POST['notitie'] ?? '');
         if ($notitie !== '') {
@@ -120,7 +147,10 @@ $subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
 
 // ---- Gekoppelde protocollen --------------------------------------------
 $gekoppeld_stmt = $pdo->prepare(
-    'SELECT p.* FROM protocollen p
+    'SELECT p.*, s.naam AS sub_naam, h.naam AS hoofd_naam, h.kleur AS hoofd_kleur
+     FROM protocollen p
+     LEFT JOIN subclassificaties s ON s.id = p.subclassificatie_id
+     LEFT JOIN hoofdclassificaties h ON h.id = s.hoofdclassificatie_id
      JOIN melding_protocollen mp ON mp.protocol_id = p.id
      WHERE mp.melding_id = :id ORDER BY p.titel'
 );
@@ -248,7 +278,35 @@ include __DIR__ . '/includes/header.php';
                     <button type="submit" class="btn btn-small btn-danger">Loskoppelen</button>
                 </form>
             </div>
+            <?php if ($p['sub_naam']): ?>
+                <p class="cat-chip" style="display:inline-block; background: <?= e($p['hoofd_kleur']) ?>22; color: <?= e($p['hoofd_kleur']) ?>; margin: 0 0 8px;">
+                    <?= e($p['hoofd_naam']) ?> &middot; <?= e($p['sub_naam']) ?>
+                </p>
+            <?php endif; ?>
             <p><?= e($p['inhoud']) ?></p>
+
+            <?php $subtaken = get_subtaken_met_status($pdo, $p['id'], $id); ?>
+            <?php if ($subtaken): ?>
+                <?php
+                    $aantal_afgevinkt = count(array_filter($subtaken, fn($t) => (int) $t['afgevinkt'] === 1));
+                ?>
+                <div class="subtaken-blok">
+                    <p class="subtaken-kop">Subtaken (<?= $aantal_afgevinkt ?>/<?= count($subtaken) ?>)</p>
+                    <?php foreach ($subtaken as $t): ?>
+                        <form method="post" class="subtaak-regel">
+                            <input type="hidden" name="actie" value="subtaak_wisselen">
+                            <input type="hidden" name="subtaak_id" value="<?= $t['id'] ?>">
+                            <label>
+                                <input type="checkbox" onchange="this.form.submit()" <?= $t['afgevinkt'] ? 'checked' : '' ?>>
+                                <span class="<?= $t['afgevinkt'] ? 'afgevinkt' : '' ?>"><?= e($t['omschrijving']) ?></span>
+                            </label>
+                            <?php if ($t['afgevinkt'] && $t['afgevinkt_door_naam']): ?>
+                                <span class="subtaak-meta"><?= e($t['afgevinkt_door_naam']) ?> · <?= (new DateTime($t['afgevinkt_op']))->format('d-m H:i') ?></span>
+                            <?php endif; ?>
+                        </form>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
     <?php endforeach; ?>
 

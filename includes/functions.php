@@ -71,10 +71,91 @@ function get_subclassificaties_gegroepeerd(PDO $pdo): array
     return $gegroepeerd;
 }
 
-/** Haalt alle protocollen op */
+/** Haalt alle protocollen op, met naam van gekoppelde sub-/hoofdclassificatie erbij */
 function get_protocollen(PDO $pdo): array
 {
-    return $pdo->query('SELECT * FROM protocollen ORDER BY titel ASC')->fetchAll();
+    return $pdo->query(
+        'SELECT p.*, s.naam AS sub_naam, h.naam AS hoofd_naam, h.kleur AS hoofd_kleur
+         FROM protocollen p
+         LEFT JOIN subclassificaties s ON s.id = p.subclassificatie_id
+         LEFT JOIN hoofdclassificaties h ON h.id = s.hoofdclassificatie_id
+         ORDER BY p.titel ASC'
+    )->fetchAll();
+}
+
+/** Haalt de subtaken van 1 protocol op, in de ingestelde volgorde */
+function get_subtaken(PDO $pdo, int $protocol_id): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT * FROM protocol_subtaken WHERE protocol_id = :p ORDER BY volgorde ASC, id ASC'
+    );
+    $stmt->execute(['p' => $protocol_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Haalt de subtaken van 1 protocol op, mét de afvinkstatus voor 1 specifieke
+ * melding (afgevinkt, door wie, wanneer). Gebruikt op de melddetailpagina.
+ */
+function get_subtaken_met_status(PDO $pdo, int $protocol_id, int $melding_id): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT t.*, st.afgevinkt, st.afgevinkt_op, g.naam AS afgevinkt_door_naam
+         FROM protocol_subtaken t
+         LEFT JOIN melding_subtaak_status st ON st.subtaak_id = t.id AND st.melding_id = :m
+         LEFT JOIN gebruikers g ON g.id = st.afgevinkt_door_id
+         WHERE t.protocol_id = :p
+         ORDER BY t.volgorde ASC, t.id ASC'
+    );
+    $stmt->execute(['m' => $melding_id, 'p' => $protocol_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Zoekt een hoofd-/subclassificatie op basis van een commando-tekst
+ * (bv. "medisch" of "reanimatie", zonder het voorloop-streepje).
+ * Exacte naam-matches gaan voor gedeeltelijke matches; subclassificaties
+ * gaan voor hoofdclassificaties. Retourneert null als niets gevonden is.
+ */
+function vind_classificatie_commando(PDO $pdo, string $zoekterm): ?array
+{
+    $zoekterm = trim($zoekterm);
+    if ($zoekterm === '') {
+        return null;
+    }
+
+    $subquery = "SELECT s.id AS sub_id, s.naam AS sub_naam, h.id AS hoofd_id, h.naam AS hoofd_naam
+                 FROM subclassificaties s JOIN hoofdclassificaties h ON h.id = s.hoofdclassificatie_id
+                 WHERE s.naam %s ORDER BY s.naam ASC LIMIT 1";
+    $hoofdquery = "SELECT id AS hoofd_id, naam AS hoofd_naam FROM hoofdclassificaties WHERE naam %s ORDER BY naam ASC LIMIT 1";
+
+    // 1. Exacte match, subclassificatie heeft voorrang
+    $stmt = $pdo->prepare(sprintf($subquery, '= :z'));
+    $stmt->execute(['z' => $zoekterm]);
+    if ($rij = $stmt->fetch()) {
+        return $rij;
+    }
+
+    $stmt = $pdo->prepare(sprintf($hoofdquery, '= :z'));
+    $stmt->execute(['z' => $zoekterm]);
+    if ($rij = $stmt->fetch()) {
+        return ['hoofd_id' => $rij['hoofd_id'], 'hoofd_naam' => $rij['hoofd_naam'], 'sub_id' => null, 'sub_naam' => null];
+    }
+
+    // 2. Gedeeltelijke match
+    $stmt = $pdo->prepare(sprintf($subquery, 'LIKE :z'));
+    $stmt->execute(['z' => '%' . $zoekterm . '%']);
+    if ($rij = $stmt->fetch()) {
+        return $rij;
+    }
+
+    $stmt = $pdo->prepare(sprintf($hoofdquery, 'LIKE :z'));
+    $stmt->execute(['z' => '%' . $zoekterm . '%']);
+    if ($rij = $stmt->fetch()) {
+        return ['hoofd_id' => $rij['hoofd_id'], 'hoofd_naam' => $rij['hoofd_naam'], 'sub_id' => null, 'sub_naam' => null];
+    }
+
+    return null;
 }
 
 /** Labels en kleurklassen voor status */
@@ -111,6 +192,17 @@ function prioriteit_label(string $prioriteit): string
 function prioriteit_class(string $prioriteit): string
 {
     return 'prio-' . $prioriteit;
+}
+
+/** Hex-kleur per prioriteit, gebruikt op de retro-melddetailpagina */
+function prioriteit_kleur(string $prioriteit): string
+{
+    return [
+        'laag'    => '#a8a8a8',
+        'normaal' => '#7ea6d8',
+        'hoog'    => '#f5a524',
+        'kritiek' => '#e04b3f',
+    ][$prioriteit] ?? '#c0c0c0';
 }
 
 /** Login / rollen helpers */

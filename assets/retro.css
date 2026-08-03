@@ -1,0 +1,305 @@
+/* ============================================================
+   RETRO MELDKAMER STYLE
+   Nagebootst op klassieke Nederlandse meldkamersystemen (GMS-stijl):
+   grijze Windows 3D-vakken, groene classificatievelden, cyaan
+   invoerveld voor het logboek.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #808080;
+    color: #000;
+    font-family: 'Tahoma', 'MS Sans Serif', Geneva, sans-serif;
+    font-size: 12px;
+}
+
+.retro-wrap {
+    max-width: 1100px;
+    margin: 16px auto;
+    background: #c0c0c0;
+    padding: 6px;
+    border: 2px solid #fff;
+    box-shadow: inset -1px -1px 0 #404040, inset 1px 1px 0 #dfdfdf, 2px 2px 6px rgba(0,0,0,0.5);
+}
+
+/* --- 3D bevel helpers ------------------------------------------------ */
+.raised {
+    background: #c0c0c0;
+    border-top: 1px solid #fff;
+    border-left: 1px solid #fff;
+    border-right: 1px solid #404040;
+    border-bottom: 1px solid #404040;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+}
+
+.sunken {
+    background: #fff;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    box-shadow: inset 1px 1px 0 #808080;
+}
+
+/* --- Titelbalk --------------------------------------------------------- */
+.retro-titlebar {
+    background: linear-gradient(90deg, #000080, #1084d0);
+    color: #fff;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 3px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+.retro-titlebar a {
+    color: #fff;
+    text-decoration: none;
+    background: #c0c0c0;
+    color: #000;
+    font-size: 11px;
+    padding: 1px 8px;
+    margin-left: 4px;
+}
+.retro-titlebar .titel-links { display: flex; gap: 8px; align-items: center; }
+.retro-titlebar .meldid { font-family: 'Courier New', monospace; }
+
+/* --- Statustabs (bovenste rij, zoals COM/EDB/DUB...) ------------------ */
+.retro-tabstrip-status {
+    display: flex;
+    gap: 2px;
+    padding: 3px 3px 0;
+}
+.retro-tabstrip-status form { margin: 0; }
+.retro-tab-status {
+    font-family: inherit;
+    font-size: 11px;
+    padding: 3px 10px;
+    cursor: pointer;
+    background: #c0c0c0;
+    border-top: 1px solid #fff;
+    border-left: 1px solid #fff;
+    border-right: 1px solid #404040;
+    border-bottom: none;
+}
+.retro-tab-status.actief {
+    background: #f5a524;
+    font-weight: bold;
+}
+.retro-tab-status:hover { background: #d8d8d8; }
+.retro-tab-status.actief:hover { background: #f5a524; }
+
+/* --- Sub-tabs (Hist. kladblok / Protocollen / Overzicht) --------------- */
+.retro-tabstrip-sub {
+    display: flex;
+    gap: 2px;
+    padding: 4px 3px 0;
+    border-top: 1px solid #808080;
+}
+.retro-subtab {
+    font-family: inherit;
+    font-size: 11px;
+    padding: 3px 12px;
+    cursor: pointer;
+    background: #c0c0c0;
+    border-top: 1px solid #fff;
+    border-left: 1px solid #fff;
+    border-right: 1px solid #404040;
+    border-bottom: none;
+}
+.retro-subtab.actief {
+    background: #fff;
+    font-weight: bold;
+}
+
+/* --- Grijze scrollbox (logboek/protocollen/overzicht) ------------------ */
+.retro-logbox {
+    background: #fff;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    box-shadow: inset 1px 1px 0 #808080;
+    margin: 0 3px;
+    height: 150px;
+    overflow-y: auto;
+    padding: 6px 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.retro-logbox .entry { margin-bottom: 10px; }
+.retro-logbox .entry .kop { color: #808080; }
+.retro-logbox .entry .kop b { color: #000; }
+.retro-logbox .leeg { color: #808080; font-style: italic; }
+
+/* --- MC / classificatierij (groen) ------------------------------------- */
+.retro-mc-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 3px;
+}
+.retro-mc-label {
+    font-weight: bold;
+    font-size: 11px;
+    padding: 3px 6px;
+    background: #c0c0c0;
+    border-top: 1px solid #fff;
+    border-left: 1px solid #fff;
+    border-right: 1px solid #404040;
+    border-bottom: 1px solid #404040;
+}
+.retro-select-green {
+    flex: 1;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 3px 4px;
+    background: #9dbb6b;
+    color: #08260a;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #e7f2d8;
+    border-bottom: 1px solid #e7f2d8;
+    box-shadow: inset 1px 1px 0 #6f8a48;
+}
+
+/* --- Twee kolommen: kenmerken + notitie-invoer --------------------------- */
+.retro-columns {
+    display: flex;
+    gap: 6px;
+    padding: 4px 3px;
+    align-items: flex-start;
+}
+.retro-col-links { width: 260px; flex-shrink: 0; }
+.retro-col-rechts { flex: 1; min-width: 0; }
+
+.retro-kenmerken {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    box-shadow: inset 1px 1px 0 #808080;
+    font-size: 11.5px;
+}
+.retro-kenmerken th {
+    background: #c0c0c0;
+    text-align: left;
+    padding: 3px 6px;
+    border-bottom: 1px solid #808080;
+    font-size: 11px;
+}
+.retro-kenmerken td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: top;
+}
+.retro-kenmerken td.k { color: #404040; white-space: nowrap; }
+
+.retro-omschrijving {
+    background: #fff;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    box-shadow: inset 1px 1px 0 #808080;
+    padding: 6px 8px;
+    height: 68px;
+    overflow-y: auto;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+.retro-omschrijving .titel { font-weight: bold; }
+
+.retro-tijdstempel {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 2px 0;
+}
+
+.retro-notitie-veld {
+    width: 100%;
+    height: 70px;
+    background: #bfe8e4;
+    color: #002620;
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    padding: 6px 8px;
+    resize: vertical;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #e0fbf8;
+    border-bottom: 1px solid #e0fbf8;
+    box-shadow: inset 1px 1px 0 #5fada5;
+}
+
+/* --- Onderste controlerij ------------------------------------------------ */
+.retro-controlrow {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    padding: 8px 3px 4px;
+    border-top: 1px solid #808080;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.retro-field-groep { display: flex; flex-direction: column; gap: 2px; }
+.retro-field-groep label {
+    font-size: 10.5px;
+    color: #404040;
+}
+.retro-field-groep select,
+.retro-field-groep input[type=text] {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 3px 4px;
+    background: #fff;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    box-shadow: inset 1px 1px 0 #808080;
+}
+
+.retro-btn {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 14px;
+    background: #c0c0c0;
+    cursor: pointer;
+    border-top: 1px solid #fff;
+    border-left: 1px solid #fff;
+    border-right: 1px solid #404040;
+    border-bottom: 1px solid #404040;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+}
+.retro-btn:active {
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    box-shadow: inset 1px 1px 0 #808080;
+}
+.retro-btn-primary { font-weight: bold; }
+.retro-btn-warn { color: #a30000; font-weight: bold; }
+.retro-btn-row { display: flex; gap: 4px; margin-left: auto; }
+
+.retro-melding-groter {
+    font-size: 11px;
+    color: #303030;
+    padding: 2px 3px 6px;
+}
+
+@media (max-width: 760px) {
+    .retro-columns { flex-direction: column; }
+    .retro-col-links { width: 100%; }
+    .retro-tabstrip-status, .retro-tabstrip-sub { flex-wrap: wrap; }
+}
