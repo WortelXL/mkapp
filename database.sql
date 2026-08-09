@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS locaties (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Hoofdclassificatie, bv. "Medisch", "Beveiliging", "Techniek"
+-- Labels om meldingen te markeren voor latere opvolging, onafhankelijk van
+-- de status (werkt dus zowel op actieve als afgesloten/gearchiveerde
+-- meldingen). Zie melding_labels hieronder voor de koppeling.
+CREATE TABLE IF NOT EXISTS labels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    naam VARCHAR(100) NOT NULL UNIQUE,
+    kleur VARCHAR(7) NOT NULL DEFAULT '#f5a524',
+    beschrijving VARCHAR(255) DEFAULT NULL,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS hoofdclassificaties (
     id INT AUTO_INCREMENT PRIMARY KEY,
     naam VARCHAR(100) NOT NULL,
@@ -110,6 +121,15 @@ CREATE TABLE IF NOT EXISTS melding_protocollen (
     PRIMARY KEY (melding_id, protocol_id),
     FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
     FOREIGN KEY (protocol_id) REFERENCES protocollen(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS melding_labels (
+    melding_id INT NOT NULL,
+    label_id INT NOT NULL,
+    gekoppeld_op DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (melding_id, label_id),
+    FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
+    FOREIGN KEY (label_id) REFERENCES labels(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS melding_notities (

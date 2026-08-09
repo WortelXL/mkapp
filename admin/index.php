@@ -66,6 +66,11 @@ include __DIR__ . '/../includes/header.php';
         <p style="color:var(--muted); margin-top:-8px;">Vooraf ingestelde locaties, oproepbaar met ;naam in omschrijving/notities.</p>
         <a href="/admin/locaties.php" class="btn btn-primary">Locaties beheren</a>
     </div>
+    <div class="panel">
+        <h2>Labels</h2>
+        <p style="color:var(--muted); margin-top:-8px;">Labels om meldingen te markeren voor latere opvolging, ook in het archief.</p>
+        <a href="/admin/labels.php" class="btn btn-primary">Labels beheren</a>
+    </div>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

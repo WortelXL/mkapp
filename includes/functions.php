@@ -173,6 +173,24 @@ function vind_subclassificatie_op_naam(PDO $pdo, string $naam): ?array
     return $stmt->fetch() ?: null;
 }
 
+/** Haalt alle labels op, alfabetisch */
+function get_labels(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM labels ORDER BY naam ASC')->fetchAll();
+}
+
+/** Haalt de labels op die aan 1 specifieke melding gekoppeld zijn */
+function get_labels_voor_melding(PDO $pdo, int $melding_id): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT l.* FROM labels l
+         JOIN melding_labels ml ON ml.label_id = l.id
+         WHERE ml.melding_id = :m ORDER BY l.naam ASC'
+    );
+    $stmt->execute(['m' => $melding_id]);
+    return $stmt->fetchAll();
+}
+
 /** Haalt alle protocollen op, met naam van gekoppelde sub-/hoofdclassificatie erbij */
 function get_protocollen(PDO $pdo): array
 {
@@ -183,6 +201,32 @@ function get_protocollen(PDO $pdo): array
          LEFT JOIN hoofdclassificaties h ON h.id = s.hoofdclassificatie_id
          ORDER BY p.titel ASC'
     )->fetchAll();
+}
+
+/** Haalt de protocollen op die aan 1 specifieke subclassificatie gekoppeld zijn */
+function protocollen_voor_subclassificatie(PDO $pdo, int $subclassificatie_id): array
+{
+    $stmt = $pdo->prepare('SELECT * FROM protocollen WHERE subclassificatie_id = :s');
+    $stmt->execute(['s' => $subclassificatie_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Koppelt automatisch alle protocollen die bij deze subclassificatie horen
+ * aan een melding (bv. bij het aanmaken, of bij het wijzigen van de
+ * classificatie). Gebruikt INSERT IGNORE, dus al gekoppelde protocollen
+ * worden overgeslagen en handmatig losgekoppelde protocollen komen niet
+ * vanzelf terug tenzij de classificatie opnieuw wordt opgeslagen.
+ */
+function koppel_protocollen_automatisch(PDO $pdo, int $melding_id, ?int $subclassificatie_id): void
+{
+    if (!$subclassificatie_id) {
+        return;
+    }
+    $stmt = $pdo->prepare('INSERT IGNORE INTO melding_protocollen (melding_id, protocol_id) VALUES (:m, :p)');
+    foreach (protocollen_voor_subclassificatie($pdo, $subclassificatie_id) as $protocol) {
+        $stmt->execute(['m' => $melding_id, 'p' => $protocol['id']]);
+    }
 }
 
 /** Haalt de subtaken van 1 protocol op, in de ingestelde volgorde */

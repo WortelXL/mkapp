@@ -8,6 +8,7 @@ $f_status     = $_GET['status'] ?? '';
 $f_hoofd      = $_GET['hoofd'] ?? '';
 $f_sub        = $_GET['sub'] ?? '';
 $f_prioriteit = $_GET['prioriteit'] ?? '';
+$f_label      = $_GET['label'] ?? '';
 $f_zoek       = trim($_GET['q'] ?? '');
 
 // Commando in de zoekbalk: "-medisch" of "-reanimatie" (zelfde als dashboard)
@@ -61,6 +62,10 @@ if ($f_prioriteit !== '' && in_array($f_prioriteit, ['laag','normaal','hoog','kr
     $where[] = 'm.prioriteit = :prioriteit';
     $params['prioriteit'] = $f_prioriteit;
 }
+if ($f_label !== '' && ctype_digit($f_label)) {
+    $where[] = 'EXISTS (SELECT 1 FROM melding_labels ml2 WHERE ml2.melding_id = m.id AND ml2.label_id = :label)';
+    $params['label'] = (int) $f_label;
+}
 if ($f_zoek !== '') {
     $where[] = '(m.titel LIKE :zoek OR m.meld_id LIKE :zoek OR m.locatie LIKE :zoek)';
     $params['zoek'] = '%' . $f_zoek . '%';
@@ -84,11 +89,30 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $meldingen = $stmt->fetchAll();
 
+// Labels per melding ophalen (los van de hoofdquery, voorkomt GROUP BY-gedoe
+// met de andere joins hierboven)
+$labels_per_melding = [];
+if ($meldingen) {
+    $ids = array_column($meldingen, 'id');
+    $plekhouders = implode(',', array_fill(0, count($ids), '?'));
+    $labels_stmt = $pdo->prepare(
+        "SELECT ml.melding_id, l.* FROM melding_labels ml
+         JOIN labels l ON l.id = ml.label_id
+         WHERE ml.melding_id IN ($plekhouders)
+         ORDER BY l.naam ASC"
+    );
+    $labels_stmt->execute($ids);
+    foreach ($labels_stmt->fetchAll() as $rij) {
+        $labels_per_melding[$rij['melding_id']][] = $rij;
+    }
+}
+
 // ---- Tellingen ----------------------------------------------------------
 $totaal_afgehandeld = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'afgehandeld'")->fetchColumn();
 $totaal_geannuleerd = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'geannuleerd'")->fetchColumn();
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
+$alle_labels = get_labels($pdo);
 
 $actief = 'archief';
 $paginatitel = 'Archief';
@@ -160,11 +184,17 @@ include __DIR__ . '/includes/header.php';
             <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
         <?php endforeach; ?>
     </select>
+    <select name="label">
+        <option value="">Alle labels</option>
+        <?php foreach ($alle_labels as $l): ?>
+            <option value="<?= $l['id'] ?>" <?= $f_label == $l['id'] ? 'selected' : '' ?>><?= e($l['naam']) ?></option>
+        <?php endforeach; ?>
+    </select>
     <?php if ($f_sub): ?>
         <input type="hidden" name="sub" value="<?= (int) $f_sub ?>">
     <?php endif; ?>
     <button type="submit" class="btn btn-small">Filteren</button>
-    <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek): ?>
+    <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_label || $f_zoek): ?>
         <a href="/archief.php" class="btn btn-small">Wissen</a>
     <?php endif; ?>
 </form>
@@ -184,6 +214,13 @@ include __DIR__ . '/includes/header.php';
                     · afgerond <?= (new DateTime($m['bijgewerkt_op']))->format('d-m H:i') ?>
                     · ingevoerd door <?= e($m['aangemaakt_door_naam'] ?: 'onbekend') ?>
                 </span>
+                <?php if (!empty($labels_per_melding[$m['id']])): ?>
+                    <span class="meta">
+                        <?php foreach ($labels_per_melding[$m['id']] as $l): ?>
+                            <span class="cat-chip" style="background: <?= e($l['kleur']) ?>22; color: <?= e($l['kleur']) ?>; margin-right:4px;"><?= e($l['naam']) ?></span>
+                        <?php endforeach; ?>
+                    </span>
+                <?php endif; ?>
             </span>
             <?php if ($m['hoofd_naam']): ?>
                 <span class="cat-chip" style="background: <?= e($m['hoofd_kleur']) ?>22; color: <?= e($m['hoofd_kleur']) ?>;">

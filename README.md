@@ -160,14 +160,21 @@ titel automatisch mee bijgewerkt.
 - **Melddetail (`/melding.php?id=...`)** — classificatie, status en
   prioriteit bijwerken, toewijzen aan een team/persoon, protocollen
   koppelen of loskoppelen, en een logboek met notities bijhouden (elke
-  notitie toont wie hem plaatste).
+  notitie toont wie hem plaatste). Protocollen die aan de gekozen
+  subclassificatie zijn gekoppeld (via Beheer &rarr; Protocollen) worden
+  automatisch aan de melding gekoppeld zodra die subclassificatie gekozen
+  wordt — zowel bij het aanmaken als bij het achteraf wijzigen van de
+  classificatie. Dit gebeurt naast de handmatige koppeling: je kunt een
+  automatisch gekoppeld protocol gewoon loskoppelen, of zelf een ander
+  protocol toevoegen, zoals altijd.
 - **Beheer (`/admin/`)** — alleen voor gebruikers met de rol beheerder:
   - **Gebruikers** toevoegen, activeren/deactiveren, van rol wisselen of
     verwijderen.
   - **Classificaties** — hoofd- en subclassificaties aanmaken en
     verwijderen (met eigen kleur per hoofdclassificatie).
-  - **Protocollen** aanmaken, bewerken en verwijderen — deze protocollen
-    zijn het wat er op de melddetailpagina gekoppeld kan worden.
+  - **Protocollen** aanmaken, bewerken en verwijderen, gekoppeld aan een
+    subclassificatie — deze protocollen zijn het wat automatisch (en
+    handmatig) aan een melding gekoppeld kan worden.
 
 ## API: meldingen aanmaken vanaf een Stream Deck of andere koppeling
 
@@ -221,6 +228,21 @@ zichzelf automatisch (interval instelbaar per gebruiker, zie hieronder),
 zodat een melding die via de API of door een collega wordt aangemaakt
 vanzelf verschijnt bij iedereen die het dashboard open heeft staan —
 niemand hoeft handmatig te verversen.
+
+## Labels (later opvolgen)
+
+Beheerders maken labels aan via **Beheer &rarr; Labels**
+(`/admin/labels.php`) — naam + kleur, bv. "Later opvolgen" of "Schade
+gemeld bij verzekering". Labels zijn onafhankelijk van de status van een
+melding: je kunt ze op zowel actieve als afgeronde (gearchiveerde)
+meldingen zetten.
+
+Op de melddetailpagina (`/melding.php?id=...`) staat een "Labels"-paneel
+bovenaan waar je labels kan toevoegen en weer verwijderen — een melding
+kan meerdere labels tegelijk hebben. Labels zijn ook zichtbaar als chips op
+zowel het dashboard als het archief, en in het **archief** kun je er
+specifiek op filteren (naast categorie en prioriteit) om snel te zien welke
+afgeronde meldingen nog opvolging nodig hebben.
 
 ## Vooraf ingestelde locaties
 

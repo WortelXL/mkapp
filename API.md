@@ -31,8 +31,13 @@ Geen (geldig) token meegestuurd? Dan antwoordt de API met **401**.
 
 ```
 POST /api/melding.php
+Content-Type: application/json
+   -- of --
 Content-Type: application/x-www-form-urlencoded  (of multipart/form-data)
 ```
+
+Beide werken; kies wat je koppeling het makkelijkst aanbiedt. Veel
+Stream Deck-plugins (zoals "API Request") sturen standaard JSON.
 
 ### Velden
 
@@ -57,9 +62,17 @@ alleen een geldig token maakt een "Ongeclassificeerde melding" aan.
   "success": true,
   "id": 42,
   "meld_id": "MK-D2-014",
-  "status": "open"
+  "status": "open",
+  "protocollen": ["Protocol reanimatie"]
 }
 ```
+
+`protocollen` toont de titels van protocollen die automatisch zijn
+gekoppeld omdat ze bij de gekozen subclassificatie horen (ingesteld via
+Beheer &rarr; Protocollen). Is er geen subclassificatie gekozen of matcht
+er geen protocol, dan is dit een lege lijst `[]`. Automatisch gekoppelde
+protocollen kun je op de melddetailpagina gewoon weer loskoppelen, of
+handmatig een ander protocol toevoegen.
 
 ### Antwoord bij een fout
 
@@ -73,7 +86,7 @@ alleen een geldig token maakt een "Ongeclassificeerde melding" aan.
 
 ## Voorbeelden
 
-### curl
+### curl (form-encoded)
 
 ```bash
 curl -X POST https://jouw-domein/api/melding.php \
@@ -81,6 +94,15 @@ curl -X POST https://jouw-domein/api/melding.php \
   -d "classificatie=reanimatie" \
   -d "locatie=Podium 1" \
   -d "prioriteit=kritiek"
+```
+
+### curl (JSON)
+
+```bash
+curl -X POST https://jouw-domein/api/melding.php \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"classificatie": "reanimatie", "locatie": "Podium 1", "prioriteit": "kritiek"}'
 ```
 
 Alleen een classificatie, verder alles automatisch (titel, prioriteit via

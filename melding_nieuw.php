@@ -45,7 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'gemeld_door'        => $gemeld_door ?: null,
             'aangemaakt_door_id' => $_SESSION['gebruiker_id'],
         ]);
-        header('Location: /melding.php?id=' . $pdo->lastInsertId() . '&aangemaakt=1');
+        $nieuwe_melding_id = (int) $pdo->lastInsertId();
+        koppel_protocollen_automatisch($pdo, $nieuwe_melding_id, $subclassificatie_id);
+        header('Location: /melding.php?id=' . $nieuwe_melding_id . '&aangemaakt=1');
         exit;
     }
 }

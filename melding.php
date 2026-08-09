@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'gebruiker' => $_SESSION['gebruiker_id'],
             'id' => $id,
         ]);
+        koppel_protocollen_automatisch($pdo, $id, $sub_id);
         header('Location: /melding.php?id=' . $id . '&bijgewerkt=1');
         exit;
     }
@@ -152,12 +153,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($actie === 'label_koppelen') {
+        $label_id = (int) ($_POST['label_id'] ?? 0);
+        if ($label_id > 0) {
+            $stmt = $pdo->prepare('INSERT IGNORE INTO melding_labels (melding_id, label_id) VALUES (:m, :l)');
+            $stmt->execute(['m' => $id, 'l' => $label_id]);
+        }
+        header('Location: /melding.php?id=' . $id . '#labels');
+        exit;
+    }
+
+    if ($actie === 'label_ontkoppelen') {
+        $label_id = (int) ($_POST['label_id'] ?? 0);
+        $stmt = $pdo->prepare('DELETE FROM melding_labels WHERE melding_id = :m AND label_id = :l');
+        $stmt->execute(['m' => $id, 'l' => $label_id]);
+        header('Location: /melding.php?id=' . $id . '#labels');
+        exit;
+    }
+
     // herlaad melding na eventuele wijziging
     $melding_stmt->execute(['id' => $id]);
     $melding = $melding_stmt->fetch();
 }
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
+$gekoppelde_labels = get_labels_voor_melding($pdo, $id);
+$gekoppelde_label_ids = array_column($gekoppelde_labels, 'id');
+$alle_labels = get_labels($pdo);
+$beschikbare_labels = array_filter($alle_labels, fn($l) => !in_array($l['id'], $gekoppelde_label_ids, true));
 $subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
 
 // ---- Gekoppelde protocollen --------------------------------------------
@@ -227,6 +250,36 @@ include __DIR__ . '/includes/header.php';
     <div class="kv"><div class="k">Aangemaakt</div><div class="v"><?= (new DateTime($melding['aangemaakt_op']))->format('d-m-Y H:i') ?></div></div>
     <div class="kv"><div class="k">Ingevoerd door</div><div class="v"><?= e($melding['aangemaakt_door_naam'] ?: 'onbekend') ?></div></div>
     <div class="kv"><div class="k">Laatst bijgewerkt door</div><div class="v"><?= e($melding['bijgewerkt_door_naam'] ?: '—') ?></div></div>
+    <div class="kv">
+        <div class="k">Labels</div>
+        <div class="v">
+            <div style="display:flex; flex-wrap:wrap; gap:4px; <?= $gekoppelde_labels ? 'margin-bottom:6px;' : '' ?>">
+                <?php foreach ($gekoppelde_labels as $l): ?>
+                    <form method="post" style="display:inline-flex;">
+                        <input type="hidden" name="actie" value="label_ontkoppelen">
+                        <input type="hidden" name="label_id" value="<?= $l['id'] ?>">
+                        <button type="submit" class="cat-chip" style="border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; background: <?= e($l['kleur']) ?>22; color: <?= e($l['kleur']) ?>; font-family:inherit;" title="Klik om dit label te verwijderen">
+                            <?= e($l['naam']) ?> &times;
+                        </button>
+                    </form>
+                <?php endforeach; ?>
+                <?php if (!$gekoppelde_labels): ?>—<?php endif; ?>
+            </div>
+            <?php if ($beschikbare_labels): ?>
+                <form method="post">
+                    <input type="hidden" name="actie" value="label_koppelen">
+                    <select name="label_id" onchange="this.form.submit()" style="width:100%; font-size:11.5px; padding:4px 6px; font-family: var(--font-body);">
+                        <option value="" selected disabled>+ label toevoegen...</option>
+                        <?php foreach ($beschikbare_labels as $l): ?>
+                            <option value="<?= $l['id'] ?>"><?= e($l['naam']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+            <?php elseif (!$alle_labels): ?>
+                <a href="/admin/labels.php" style="color: var(--amber); font-size:11.5px;">+ label aanmaken</a>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <?php if ($melding['omschrijving']): ?>
@@ -304,7 +357,7 @@ include __DIR__ . '/includes/header.php';
                 <div class="field">
                     <label for="notitie">Nieuwe notitie (als <?= e(huidige_gebruiker_naam()) ?>)</label>
                     <textarea id="notitie" name="notitie" placeholder="Update, actie ondernomen, overdracht..." required></textarea>
-                    <p style="color:var(--muted); font-size:11.5px; margin:6px 0 0;">Tip: typ <code>;locatienaam</code> om de locatie van deze melding automatisch bij te werken.</p>
+                    <p style="color:var(--muted); font-size:11.5px; margin:6px 0 0;">Enter slaat de notitie meteen op (Shift+Enter voor een nieuwe regel binnen dezelfde notitie). Tip: typ <code>;locatienaam</code> om de locatie van deze melding automatisch bij te werken.</p>
                 </div>
                 <div class="actions">
                     <button type="submit" class="btn btn-primary">Notitie toevoegen</button>
@@ -407,6 +460,23 @@ function vulSubclassificaties2() {
 hoofdSelect2.addEventListener('change', vulSubclassificaties2);
 vulSubclassificaties2();
 
+// Enter slaat de notitie meteen op (Shift+Enter voegt een nieuwe regel toe
+// binnen dezelfde notitie, zoals in de meeste chatprogramma's).
+(function () {
+    const notitieVeld = document.getElementById('notitie');
+    if (!notitieVeld) {
+        return;
+    }
+    notitieVeld.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            if (notitieVeld.value.trim() !== '') {
+                notitieVeld.form.submit();
+            }
+        }
+    });
+})();
+
 // Ververst deze melding automatisch zodat wijzigingen van collega's
 // (status, notities, subtaken, etc.) live zichtbaar worden bij iedereen
 // die deze melding open heeft staan. Pauzeert zolang iemand aan het typen
@@ -415,16 +485,28 @@ vulSubclassificaties2();
 // de persoonlijke instellingen (/profiel.php); op "Uit" gebeurt er niets.
 (function () {
     const ververs_seconden = <?= (int) $mijn_instellingen['auto_refresh_seconden'] ?>;
-    if (ververs_seconden <= 0) {
-        return;
-    }
 
     let veld_actief = false;
-
     document.querySelectorAll('input[type="text"], textarea').forEach(function (veld) {
         veld.addEventListener('focus', function () { veld_actief = true; });
         veld.addEventListener('blur', function () { veld_actief = false; });
     });
+
+    // Na een opgeslagen notitie ververst de pagina met #log in de URL --
+    // zet de focus dan automatisch terug in het notitieveld zodat je
+    // meteen door kan typen voor de volgende update. Gebeurt na het
+    // registreren van de listeners hierboven, zodat de auto-refresh het
+    // veld meteen als actief herkent en niet halverwege ververst.
+    if (window.location.hash === '#log') {
+        const notitieVeld = document.getElementById('notitie');
+        if (notitieVeld) {
+            notitieVeld.focus();
+        }
+    }
+
+    if (ververs_seconden <= 0) {
+        return;
+    }
 
     setInterval(function () {
         const heeft_selectie = (window.getSelection() || '').toString().length > 0;

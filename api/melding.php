@@ -5,8 +5,13 @@
  *
  * Aanroep: POST /api/melding.php
  * Authenticatie: header "Authorization: Bearer <token>", of een veld
- *                "token" in de POST-body (handig voor plugins die geen
+ *                "token" in de body (handig voor plugins die geen
  *                custom headers ondersteunen).
+ *
+ * Body-formaat: zowel "application/json" (bv. Stream Deck-plugins zoals
+ * "API Request") als "application/x-www-form-urlencoded" / multipart
+ * formulierdata worden ondersteund — kies wat je koppeling het makkelijkst
+ * aanbiedt.
  *
  * Velden (form-data of x-www-form-urlencoded):
  *   titel          (optioneel) - ontbreekt dit, dan wordt de titel net als
@@ -49,7 +54,19 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $pdo = get_pdo();
 
-// ---- Token ophalen: header of body -------------------------------------
+// ---- Body inlezen: ondersteunt zowel JSON als normale formuliervelden ---
+// (application/x-www-form-urlencoded of multipart/form-data vullen $_POST
+// automatisch; bij application/json moet dat handmatig, want PHP doet dat
+// niet zelf)
+$content_type = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
+if (stripos($content_type, 'application/json') !== false) {
+    $json_data = json_decode((string) file_get_contents('php://input'), true);
+    $velden = is_array($json_data) ? $json_data : [];
+} else {
+    $velden = $_POST;
+}
+
+// ---- Token ophalen: header, JSON/form-veld, of querystring --------------
 $token = '';
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 foreach ($headers as $naam => $waarde) {
@@ -58,7 +75,7 @@ foreach ($headers as $naam => $waarde) {
     }
 }
 if ($token === '') {
-    $token = trim($_POST['token'] ?? $_GET['token'] ?? '');
+    $token = trim((string) ($velden['token'] ?? $_GET['token'] ?? ''));
 }
 
 if ($token === '') {
@@ -78,14 +95,14 @@ if (!$gebruiker || !$gebruiker['actief']) {
 // titel net als in de webinterface samengesteld uit de classificatie
 // ("Hoofdclassificatie - Subclassificatie"). Wil je toch een eigen titel
 // meesturen vanaf de Stream Deck, dan kan dat nog steeds.
-$titel_override        = trim($_POST['titel'] ?? '');
-$omschrijving          = trim($_POST['omschrijving'] ?? '');
-$locatie               = trim($_POST['locatie'] ?? '');
-$gemeld_door           = trim($_POST['gemeld_door'] ?? '');
-$classificatie_tekst   = trim($_POST['classificatie'] ?? '');
-$subclassificatie_tekst = trim($_POST['subclassificatie'] ?? '');
-$prioriteit_input      = trim($_POST['prioriteit'] ?? '');
-$status_input          = trim($_POST['status'] ?? '');
+$titel_override        = trim((string) ($velden['titel'] ?? ''));
+$omschrijving          = trim((string) ($velden['omschrijving'] ?? ''));
+$locatie               = trim((string) ($velden['locatie'] ?? ''));
+$gemeld_door           = trim((string) ($velden['gemeld_door'] ?? ''));
+$classificatie_tekst   = trim((string) ($velden['classificatie'] ?? ''));
+$subclassificatie_tekst = trim((string) ($velden['subclassificatie'] ?? ''));
+$prioriteit_input      = trim((string) ($velden['prioriteit'] ?? ''));
+$status_input           = trim((string) ($velden['status'] ?? ''));
 
 $hoofd_id = null;
 $sub_id = null;
@@ -152,9 +169,17 @@ $stmt->execute([
     'gebruiker'    => $gebruiker['id'],
 ]);
 
+$nieuwe_melding_id = (int) $pdo->lastInsertId();
+koppel_protocollen_automatisch($pdo, $nieuwe_melding_id, $sub_id);
+$gekoppelde_protocol_titels = array_column(
+    $sub_id ? protocollen_voor_subclassificatie($pdo, $sub_id) : [],
+    'titel'
+);
+
 api_antwoord(201, [
-    'success'  => true,
-    'id'       => (int) $pdo->lastInsertId(),
-    'meld_id'  => $meld_id,
-    'status'   => $status,
+    'success'    => true,
+    'id'         => $nieuwe_melding_id,
+    'meld_id'    => $meld_id,
+    'status'     => $status,
+    'protocollen' => $gekoppelde_protocol_titels,
 ]);
