@@ -17,7 +17,7 @@ $paginatitel = $paginatitel ?? event_naam($pdo);
 <body>
 <div class="topbar">
     <div class="topbar-inner">
-        <a href="/index.php" class="brand">
+        <a href="<?= is_ingelogd() && is_viewer() ? '/overview.php' : '/index.php' ?>" class="brand">
             <span class="brand-mark">MK</span>
             <span>
                 <span class="brand-name">Meldkamer</span><br>
@@ -26,9 +26,14 @@ $paginatitel = $paginatitel ?? event_naam($pdo);
         </a>
         <nav class="mainnav">
             <?php if (is_ingelogd()): ?>
-                <a href="/index.php" class="<?= $actief === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
-                <a href="/melding_nieuw.php" class="<?= $actief === 'nieuw' ? 'active' : '' ?>">Nieuwe melding</a>
-                <a href="/archief.php" class="<?= $actief === 'archief' ? 'active' : '' ?>">Archief</a>
+                <?php if (is_viewer()): ?>
+                    <a href="/overview.php" class="<?= $actief === 'overview' ? 'active' : '' ?>">Overview</a>
+                <?php else: ?>
+                    <a href="/index.php" class="<?= $actief === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
+                    <a href="/melding_nieuw.php" class="<?= $actief === 'nieuw' ? 'active' : '' ?>">Nieuwe melding</a>
+                    <a href="/archief.php" class="<?= $actief === 'archief' ? 'active' : '' ?>">Archief</a>
+                    <a href="/overview.php" class="<?= $actief === 'overview' ? 'active' : '' ?>">Overview</a>
+                <?php endif; ?>
                 <?php if (is_beheerder()): ?>
                     <a href="/admin/index.php" class="<?= $actief === 'admin' ? 'active' : '' ?>">Beheer</a>
                 <?php endif; ?>

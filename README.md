@@ -109,6 +109,13 @@ De hele applicatie vereist nu een login. Er zijn twee rollen:
 - **Medewerker** — kan inloggen, het dashboard bekijken, meldingen aanmaken
   en bijwerken, notities toevoegen en protocollen aan meldingen koppelen,
   maar heeft geen toegang tot het beheerpaneel.
+- **Viewer** — mag alleen de Overview-pagina bekijken en het eigen profiel
+  (verversingstijd/geluid) aanpassen. Dashboard, nieuwe melding aanmaken,
+  melddetail, archief en beheer zijn niet toegankelijk — een viewer die
+  toch naar zo'n URL navigeert wordt automatisch teruggestuurd naar
+  Overview. Handig voor een scherm dat alleen hoeft mee te kijken, zonder
+  dat diegene iets kan aanpassen. Een API-token van een viewer-account kan
+  ook geen meldingen aanmaken.
 
 Beheerders voegen nieuwe gebruikers toe via **Beheer &rarr; Gebruikers**
 (`/admin/gebruikers.php`): naam, gebruikersnaam, tijdelijk wachtwoord en rol.
@@ -152,7 +159,16 @@ titel automatisch mee bijgewerkt.
 - **Dashboard (`/index.php`)** — live overzicht van alle meldingen met
   filters op status, prioriteit en hoofdclassificatie, een statusbord met
   tellingen (open / in behandeling / afgehandeld / kritiek-en-open), en
-  per regel de naam van de gebruiker die de melding heeft ingevoerd.
+  per regel de naam van de gebruiker die de melding heeft ingevoerd. Klik
+  op het statuslabel van een melding om de status direct te wijzigen,
+  zonder de melding te hoeven openen.
+- **Overview (`/overview.php`)** — passief overzichtsscherm (bv. voor op
+  een extra beeldscherm in de meldkamer) met dezelfde actieve meldingen en
+  hetzelfde statusbord als het dashboard, maar zonder filters en zonder
+  door te kunnen klikken naar een melding. Per melding staat een
+  schakelaartje "Logboek" dat de omschrijving en notities direct in de
+  rij zelf in-/uitklapt. Toegankelijk voor alle rollen; de rol "Viewer"
+  komt hier automatisch op uit en kan verder nergens anders komen.
 - **Nieuwe melding (`/melding_nieuw.php`)** — elke ingelogde gebruiker kan
   een melding aanmaken met hoofd-/subclassificatie; er wordt automatisch
   een uniek meld-ID gegenereerd (bv. `MK-D2-014` = dag 2, 14e melding) en
@@ -160,7 +176,9 @@ titel automatisch mee bijgewerkt.
 - **Melddetail (`/melding.php?id=...`)** — classificatie, status en
   prioriteit bijwerken, toewijzen aan een team/persoon, protocollen
   koppelen of loskoppelen, en een logboek met notities bijhouden (elke
-  notitie toont wie hem plaatste). Protocollen die aan de gekozen
+  notitie toont wie hem plaatste). Het logboek staat bovenaan en is net
+  als op Overview in-/uit te klappen via een schakelaartje (standaard
+  uitgeklapt). Protocollen die aan de gekozen
   subclassificatie zijn gekoppeld (via Beheer &rarr; Protocollen) worden
   automatisch aan de melding gekoppeld zodra die subclassificatie gekozen
   wordt — zowel bij het aanmaken als bij het achteraf wijzigen van de

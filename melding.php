@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/functions.php';
-vereis_login();
+vereis_volledige_toegang();
 $pdo = get_pdo();
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -230,16 +230,24 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <div class="panel">
-    <h2>Logboek</h2>
-    <?php if (!$notities): ?>
-        <p style="color: var(--muted);">Nog geen notities.</p>
-    <?php endif; ?>
-    <?php foreach ($notities as $n): ?>
-        <div class="note">
-            <div><?= nl2br(e($n['notitie'])) ?></div>
-            <div class="meta"><?= e($n['auteur'] ?: 'Onbekend') ?> · <?= (new DateTime($n['aangemaakt_op']))->format('d-m-Y H:i') ?></div>
-        </div>
-    <?php endforeach; ?>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+        <h2 style="margin:0;">Logboek</h2>
+        <label for="logboek-toggle" class="log-toggle-wrap" title="Logboek in-/uitklappen">
+            <span class="log-toggle-switch"></span> In-/uitklappen
+        </label>
+    </div>
+    <input type="checkbox" id="logboek-toggle" class="log-toggle-checkbox" checked>
+    <div class="row-log">
+        <?php if (!$notities): ?>
+            <p style="color: var(--muted);">Nog geen notities.</p>
+        <?php endif; ?>
+        <?php foreach ($notities as $n): ?>
+            <div class="note">
+                <div><?= nl2br(e($n['notitie'])) ?></div>
+                <div class="meta"><?= e($n['auteur'] ?: 'Onbekend') ?> · <?= (new DateTime($n['aangemaakt_op']))->format('d-m-Y H:i') ?></div>
+            </div>
+        <?php endforeach; ?>
+    </div>
 </div>
 
 <div class="kv-grid">

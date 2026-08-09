@@ -14,8 +14,13 @@ Dat token identificeert wie/welke knop de melding aanmaakt (net zoals een
 wachtwoord — behandel het ook zo, en deel het niet).
 
 **Token aanmaken/beheren:** Beheer &rarr; Gebruikers (`/admin/gebruikers.php`,
-alleen voor beheerders) &rarr; knop "Token genereren" bij het gewenste
-account. Daar kun je een token ook weer intrekken.
+alleen voor beheerders). Tokens zijn alleen beschikbaar voor accounts met
+de rol **beheerder** — bij medewerkers en viewers is er geen token-optie
+zichtbaar. Bij een beheerder-account kun je een token automatisch laten
+genereren ("Token genereren"), of zelf een specifieke waarde invullen
+("...of zelf token invullen") — handig om een token te hergebruiken dat
+je al ergens anders had geconfigureerd. Intrekken kan altijd met de knop
+"Intrekken".
 
 **Token meesturen**, op een van deze twee manieren:
 

@@ -90,6 +90,10 @@ if (!$gebruiker || !$gebruiker['actief']) {
     api_antwoord(401, ['success' => false, 'error' => 'Ongeldig of inactief API-token.']);
 }
 
+if ($gebruiker['rol'] === 'view') {
+    api_antwoord(403, ['success' => false, 'error' => 'Deze gebruiker heeft alleen leestoegang en mag geen meldingen aanmaken.']);
+}
+
 // ---- Velden -------------------------------------------------------------
 // "titel" is optioneel: geef je 'm niet mee (of laat 'm leeg), dan wordt de
 // titel net als in de webinterface samengesteld uit de classificatie

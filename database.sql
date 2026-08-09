@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS gebruikers (
     gebruikersnaam VARCHAR(50) NOT NULL UNIQUE,
     wachtwoord_hash VARCHAR(255) NOT NULL,
     naam VARCHAR(100) NOT NULL,
-    rol ENUM('beheerder','medewerker') NOT NULL DEFAULT 'medewerker',
+    rol ENUM('beheerder','medewerker','view') NOT NULL DEFAULT 'medewerker',
     actief TINYINT(1) NOT NULL DEFAULT 1,
     api_token VARCHAR(64) DEFAULT NULL UNIQUE,
     auto_refresh_seconden INT NOT NULL DEFAULT 20,

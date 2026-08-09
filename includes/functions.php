@@ -382,11 +382,31 @@ function is_beheerder(): bool
     return huidige_gebruiker_rol() === 'beheerder';
 }
 
-/** Elke ingelogde gebruiker (beheerder of medewerker) mag verder */
+/** De rol 'view' mag alleen de Overview-pagina bekijken (en het eigen profiel) */
+function is_viewer(): bool
+{
+    return huidige_gebruiker_rol() === 'view';
+}
+
+/** Elke ingelogde gebruiker (beheerder, medewerker of view) mag verder */
 function vereis_login(): void
 {
     if (!is_ingelogd()) {
         header('Location: /admin/login.php');
+        exit;
+    }
+}
+
+/**
+ * Voor pagina's die de rol 'view' NIET mag zien (dashboard, nieuwe melding,
+ * melddetail, archief). Een viewer wordt automatisch teruggestuurd naar
+ * de Overview-pagina, waar die wel mag komen.
+ */
+function vereis_volledige_toegang(): void
+{
+    vereis_login();
+    if (is_viewer()) {
+        header('Location: /overview.php');
         exit;
     }
 }
@@ -416,6 +436,7 @@ function rol_label(string $rol): string
     return [
         'beheerder'  => 'Beheerder',
         'medewerker' => 'Medewerker',
+        'view'       => 'Viewer',
     ][$rol] ?? $rol;
 }
 

@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/functions.php';
-vereis_login();
+vereis_volledige_toegang();
 $pdo = get_pdo();
 
 $fout = '';

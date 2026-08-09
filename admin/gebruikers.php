@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fout = 'Vul naam, gebruikersnaam en wachtwoord in.';
         } elseif (strlen($wachtwoord) < 8) {
             $fout = 'Gebruik een wachtwoord van minimaal 8 tekens.';
-        } elseif (!in_array($rol, ['beheerder', 'medewerker'], true)) {
+        } elseif (!in_array($rol, ['beheerder', 'medewerker', 'view'], true)) {
             $fout = 'Ongeldige rol.';
         } else {
             try {
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($actie === 'rol_wijzigen') {
         $id  = (int) ($_POST['id'] ?? 0);
         $rol = $_POST['rol'] ?? 'medewerker';
-        if (in_array($rol, ['beheerder', 'medewerker'], true)) {
+        if (in_array($rol, ['beheerder', 'medewerker', 'view'], true)) {
             $huidige = $pdo->prepare('SELECT rol, actief FROM gebruikers WHERE id = :id');
             $huidige->execute(['id' => $id]);
             $rij = $huidige->fetch();
@@ -98,11 +98,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($actie === 'wachtwoord_wijzigen') {
+        $id            = (int) ($_POST['id'] ?? 0);
+        $nieuw_wachtwoord = $_POST['nieuw_wachtwoord'] ?? '';
+
+        if (strlen($nieuw_wachtwoord) < 8) {
+            $fout = 'Gebruik een wachtwoord van minimaal 8 tekens.';
+        } else {
+            $stmt = $pdo->prepare('UPDATE gebruikers SET wachtwoord_hash = :h WHERE id = :id');
+            $stmt->execute(['h' => password_hash($nieuw_wachtwoord, PASSWORD_DEFAULT), 'id' => $id]);
+            $succes = 'Wachtwoord bijgewerkt.';
+        }
+    }
+
     if ($actie === 'token_genereren') {
         $id = (int) ($_POST['id'] ?? 0);
-        $stmt = $pdo->prepare('UPDATE gebruikers SET api_token = :t WHERE id = :id');
-        $stmt->execute(['t' => genereer_api_token(), 'id' => $id]);
-        $succes = 'Nieuw API-token gegenereerd.';
+        $doel_stmt = $pdo->prepare('SELECT rol FROM gebruikers WHERE id = :id');
+        $doel_stmt->execute(['id' => $id]);
+        if ($doel_stmt->fetchColumn() !== 'beheerder') {
+            $fout = 'API-tokens zijn alleen beschikbaar voor accounts met de rol beheerder.';
+        } else {
+            $stmt = $pdo->prepare('UPDATE gebruikers SET api_token = :t WHERE id = :id');
+            $stmt->execute(['t' => genereer_api_token(), 'id' => $id]);
+            $succes = 'Nieuw API-token gegenereerd.';
+        }
+    }
+
+    if ($actie === 'token_instellen') {
+        $id     = (int) ($_POST['id'] ?? 0);
+        $handmatig_token = trim($_POST['handmatig_token'] ?? '');
+
+        $doel_stmt = $pdo->prepare('SELECT rol FROM gebruikers WHERE id = :id');
+        $doel_stmt->execute(['id' => $id]);
+        $doel_rol = $doel_stmt->fetchColumn();
+
+        if ($doel_rol !== 'beheerder') {
+            $fout = 'API-tokens zijn alleen beschikbaar voor accounts met de rol beheerder.';
+        } elseif ($handmatig_token === '' || preg_match('/\s/', $handmatig_token)) {
+            $fout = 'Vul een token zonder spaties in.';
+        } elseif (strlen($handmatig_token) < 12 || strlen($handmatig_token) > 64) {
+            $fout = 'Een token moet tussen 12 en 64 tekens lang zijn.';
+        } else {
+            try {
+                $stmt = $pdo->prepare('UPDATE gebruikers SET api_token = :t WHERE id = :id');
+                $stmt->execute(['t' => $handmatig_token, 'id' => $id]);
+                $succes = 'Token ingesteld.';
+            } catch (PDOException $e) {
+                $fout = (int) $e->getCode() === 23000
+                    ? 'Dit token is al bij een ander account in gebruik.'
+                    : 'Er ging iets mis bij het instellen van het token.';
+            }
+        }
     }
 
     if ($actie === 'token_intrekken') {
@@ -124,7 +170,7 @@ include __DIR__ . '/../includes/header.php';
     <div>
         <p class="eyebrow"><a href="/admin/index.php" style="color:var(--muted); text-decoration:none;">&larr; Beheer</a></p>
         <h1>Gebruikers</h1>
-        <p>Beheerders hebben toegang tot classificaties, protocollen en gebruikersbeheer. Medewerkers kunnen meldingen bekijken, aanmaken en bijwerken.</p>
+        <p>Beheerders hebben toegang tot classificaties, protocollen en gebruikersbeheer. Medewerkers kunnen meldingen bekijken, aanmaken en bijwerken. Viewers mogen alleen de Overview-pagina bekijken (meekijken, verder nergens bij kunnen).</p>
     </div>
 </div>
 
@@ -152,6 +198,7 @@ include __DIR__ . '/../includes/header.php';
             <select id="rol" name="rol">
                 <option value="medewerker">Medewerker</option>
                 <option value="beheerder">Beheerder</option>
+                <option value="view">Viewer (alleen Overview)</option>
             </select>
         </div>
         <div class="actions full">
@@ -164,7 +211,7 @@ include __DIR__ . '/../includes/header.php';
     <h2>Bestaande gebruikers</h2>
     <table class="admin-table">
         <thead>
-            <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th>Status</th><th>API-token (Stream Deck e.d.)</th><th></th></tr>
+            <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th>Status</th><th>Wachtwoord</th><th>API-token (Stream Deck e.d.)</th><th></th></tr>
         </thead>
         <tbody>
         <?php foreach ($gebruikers as $g): ?>
@@ -178,6 +225,7 @@ include __DIR__ . '/../includes/header.php';
                         <select name="rol" onchange="this.form.submit()" style="padding:5px 8px; font-size:12.5px;">
                             <option value="medewerker" <?= $g['rol'] === 'medewerker' ? 'selected' : '' ?>>Medewerker</option>
                             <option value="beheerder" <?= $g['rol'] === 'beheerder' ? 'selected' : '' ?>>Beheerder</option>
+                            <option value="view" <?= $g['rol'] === 'view' ? 'selected' : '' ?>>Viewer</option>
                         </select>
                     </form>
                 </td>
@@ -187,6 +235,14 @@ include __DIR__ . '/../includes/header.php';
                     </span>
                 </td>
                 <td style="white-space:nowrap;">
+                    <form method="post" style="display:flex; gap:4px;" onsubmit="return confirm('Wachtwoord van \'<?= e($g['naam']) ?>\' wijzigen naar het ingevulde wachtwoord?');">
+                        <input type="hidden" name="actie" value="wachtwoord_wijzigen">
+                        <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                        <input type="password" name="nieuw_wachtwoord" placeholder="nieuw wachtwoord" minlength="8" style="width:130px; font-size:12px; padding:4px 6px;" required>
+                        <button type="submit" class="btn btn-small">Wijzigen</button>
+                    </form>
+                </td>
+                <td style="white-space:nowrap;">
                     <?php if ($g['api_token']): ?>
                         <input type="text" readonly value="<?= e($g['api_token']) ?>" onclick="this.select()" style="width:220px; font-family:var(--font-mono); font-size:11.5px; padding:5px 7px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:4px;">
                         <form method="post" style="display:inline;" onsubmit="return confirm('Token intrekken? Knoppen/koppelingen die dit token gebruiken werken dan niet meer.');">
@@ -194,12 +250,22 @@ include __DIR__ . '/../includes/header.php';
                             <input type="hidden" name="id" value="<?= $g['id'] ?>">
                             <button type="submit" class="btn btn-small btn-danger">Intrekken</button>
                         </form>
+                    <?php elseif ($g['rol'] === 'beheerder'): ?>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <form method="post" style="display:inline;">
+                                <input type="hidden" name="actie" value="token_genereren">
+                                <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                                <button type="submit" class="btn btn-small">Token genereren</button>
+                            </form>
+                            <form method="post" style="display:flex; gap:4px;">
+                                <input type="hidden" name="actie" value="token_instellen">
+                                <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                                <input type="text" name="handmatig_token" placeholder="of zelf token invullen..." style="width:150px; font-family:var(--font-mono); font-size:11px; padding:4px 6px;">
+                                <button type="submit" class="btn btn-small">Instellen</button>
+                            </form>
+                        </div>
                     <?php else: ?>
-                        <form method="post" style="display:inline;">
-                            <input type="hidden" name="actie" value="token_genereren">
-                            <input type="hidden" name="id" value="<?= $g['id'] ?>">
-                            <button type="submit" class="btn btn-small">Token genereren</button>
-                        </form>
+                        <span style="color:var(--muted); font-size:12px;">— (nieuw token alleen voor beheerders)</span>
                     <?php endif; ?>
                 </td>
                 <td style="white-space:nowrap;">
@@ -219,7 +285,7 @@ include __DIR__ . '/../includes/header.php';
         </tbody>
     </table>
     <p style="color:var(--muted); font-size:12px; margin:14px 0 0;">
-        Een API-token geeft toegang tot het aanmaken van meldingen via <code>/api/melding.php</code> (bv. vanaf een Stream Deck), zonder in te loggen. Behandel een token als een wachtwoord.
+        Een API-token geeft toegang tot het aanmaken van meldingen via <code>/api/melding.php</code> (bv. vanaf een Stream Deck), zonder in te loggen. Behandel een token als een wachtwoord. Een bestaand token blijft altijd zichtbaar en intrekbaar, ongeacht de rol van dat account — maar een <strong>nieuw</strong> token aanmaken (automatisch genereren of zelf invullen) kan alleen bij accounts met de rol beheerder.
     </p>
 </div>
 
