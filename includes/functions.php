@@ -239,6 +239,16 @@ function get_subtaken(PDO $pdo, int $protocol_id): array
     return $stmt->fetchAll();
 }
 
+/** Haalt de (max. 5) hyperlinks van 1 protocol op, in de ingestelde volgorde */
+function get_protocol_links(PDO $pdo, int $protocol_id): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT * FROM protocol_links WHERE protocol_id = :p ORDER BY volgorde ASC, id ASC'
+    );
+    $stmt->execute(['p' => $protocol_id]);
+    return $stmt->fetchAll();
+}
+
 /**
  * Haalt de subtaken van 1 protocol op, mét de afvinkstatus voor 1 specifieke
  * melding (afgevinkt, door wie, wanneer). Gebruikt op de melddetailpagina.

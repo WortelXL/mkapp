@@ -64,6 +64,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute(['id' => $id]);
         $succes = 'Subtaak verwijderd.';
     }
+
+    if ($actie === 'link_aanmaken') {
+        $protocol_id = (int) ($_POST['protocol_id'] ?? 0);
+        $label       = trim($_POST['label'] ?? '');
+        $url         = trim($_POST['url'] ?? '');
+
+        $aantal_stmt = $pdo->prepare('SELECT COUNT(*) FROM protocol_links WHERE protocol_id = :p');
+        $aantal_stmt->execute(['p' => $protocol_id]);
+        $huidig_aantal = (int) $aantal_stmt->fetchColumn();
+
+        if ($protocol_id <= 0 || $label === '' || $url === '') {
+            $fout = 'Vul zowel een knoptekst als een link in.';
+        } elseif ($huidig_aantal >= 5) {
+            $fout = 'Een protocol kan maximaal 5 links hebben.';
+        } elseif (!preg_match('#^https?://#i', $url)) {
+            $fout = 'De link moet beginnen met http:// of https://';
+        } else {
+            $stmt = $pdo->prepare('SELECT COALESCE(MAX(volgorde), 0) + 1 FROM protocol_links WHERE protocol_id = :p');
+            $stmt->execute(['p' => $protocol_id]);
+            $volgende_volgorde = (int) $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO protocol_links (protocol_id, label, url, volgorde) VALUES (:p, :l, :u, :v)'
+            );
+            $stmt->execute(['p' => $protocol_id, 'l' => $label, 'u' => $url, 'v' => $volgende_volgorde]);
+            $succes = 'Link toegevoegd.';
+        }
+    }
+
+    if ($actie === 'link_verwijderen') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $stmt = $pdo->prepare('DELETE FROM protocol_links WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $succes = 'Link verwijderd.';
+    }
 }
 
 if (isset($_GET['bewerk'])) {
@@ -183,6 +218,41 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="omschrijving" placeholder="Nieuwe subtaak, bv. 'AED gehaald'" style="flex:1;" required>
                     <button type="submit" class="btn btn-small">Toevoegen</button>
                 </form>
+            </div>
+
+            <?php $links = get_protocol_links($pdo, $p['id']); ?>
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+                <p style="font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 8px;">Links naar naslag/documenten (max. 5)</p>
+                <?php if (!$links): ?>
+                    <p style="color:var(--muted); font-size:13px; margin:0 0 8px;">Nog geen links voor dit protocol. Zonder links verschijnt er geen knop op de melddetailpagina.</p>
+                <?php else: ?>
+                    <ul style="margin:0 0 10px; padding-left:18px;">
+                        <?php foreach ($links as $link): ?>
+                            <li style="font-size:13.5px; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                                <span style="flex:1;">
+                                    <strong><?= e($link['label']) ?></strong>
+                                    <span style="color:var(--muted);"> &rarr; <a href="<?= e($link['url']) ?>" target="_blank" rel="noopener" style="color:var(--muted);"><?= e($link['url']) ?></a></span>
+                                </span>
+                                <form method="post" onsubmit="return confirm('Link \'<?= e($link['label']) ?>\' verwijderen?');">
+                                    <input type="hidden" name="actie" value="link_verwijderen">
+                                    <input type="hidden" name="id" value="<?= $link['id'] ?>">
+                                    <button type="submit" class="btn btn-small btn-danger">Verwijderen</button>
+                                </form>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+                <?php if (count($links) < 5): ?>
+                    <form method="post" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <input type="hidden" name="actie" value="link_aanmaken">
+                        <input type="hidden" name="protocol_id" value="<?= $p['id'] ?>">
+                        <input type="text" name="label" placeholder="Knoptekst, bv. 'Draaiboek'" style="flex:1; min-width:140px;" required>
+                        <input type="text" name="url" placeholder="https://..." style="flex:2; min-width:200px;" required>
+                        <button type="submit" class="btn btn-small">Link toevoegen</button>
+                    </form>
+                <?php else: ?>
+                    <p style="color:var(--muted); font-size:12px;">Maximum van 5 links bereikt — verwijder er eerst een om een nieuwe toe te voegen.</p>
+                <?php endif; ?>
             </div>
         </div>
     <?php endforeach; ?>

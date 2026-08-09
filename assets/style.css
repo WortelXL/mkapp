@@ -299,6 +299,7 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
     padding: 14px 16px;
     text-decoration: none;
     color: var(--text);
+    cursor: pointer;
     transition: border-color 0.15s, transform 0.1s;
 }
 
@@ -307,6 +308,20 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
 .melding-row.prio-hoog { border-left-color: var(--amber); }
 .melding-row.prio-normaal { border-left-color: var(--blue); }
 .melding-row.prio-laag { border-left-color: var(--gray); }
+
+.status-form { margin: 0; }
+select.tag {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+}
+select.tag:hover { filter: brightness(1.2); }
+select.tag:focus { box-shadow: 0 0 0 2px var(--amber-dim); }
+select.tag option { background: var(--panel-2); color: var(--text); }
 
 .melding-id {
     font-family: var(--font-mono);

@@ -174,7 +174,11 @@ titel automatisch mee bijgewerkt.
     verwijderen (met eigen kleur per hoofdclassificatie).
   - **Protocollen** aanmaken, bewerken en verwijderen, gekoppeld aan een
     subclassificatie — deze protocollen zijn het wat automatisch (en
-    handmatig) aan een melding gekoppeld kan worden.
+    handmatig) aan een melding gekoppeld kan worden. Per protocol kun je
+    ook tot **5 hyperlinks** naar extern naslag (draaiboek, plattegrond,
+    documentatie) toevoegen, elk met een zelf te kiezen knoptekst. Een
+    link-knop verschijnt op de melddetailpagina alleen als je 'm ook echt
+    hebt ingevuld — leeg blijft onzichtbaar.
 
 ## API: meldingen aanmaken vanaf een Stream Deck of andere koppeling
 

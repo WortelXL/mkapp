@@ -220,7 +220,7 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <?php foreach ($meldingen as $m): ?>
-        <a href="/melding.php?id=<?= (int) $m['id'] ?>" class="melding-row prio-<?= e($m['prioriteit']) ?>">
+        <div class="melding-row prio-<?= e($m['prioriteit']) ?>" onclick="if (!event.target.closest('.status-form')) { window.location = '/melding.php?id=<?= (int) $m['id'] ?>'; }">
             <span class="melding-id"><?= e($m['meld_id']) ?></span>
             <span class="melding-main">
                 <span class="titel"><?= e($m['titel']) ?></span>
@@ -245,10 +245,16 @@ include __DIR__ . '/includes/header.php';
                 <span></span>
             <?php endif; ?>
             <span class="tag <?= prioriteit_class($m['prioriteit']) ?>"><?= prioriteit_label($m['prioriteit']) ?></span>
-            <span class="tag <?= status_class($m['status']) ?>">
-                <span class="tag-dot"></span><?= status_label($m['status']) ?>
-            </span>
-        </a>
+            <form method="post" action="/snel_status.php" class="status-form" title="Klik om de status te wijzigen">
+                <input type="hidden" name="melding_id" value="<?= (int) $m['id'] ?>">
+                <input type="hidden" name="terug" value="<?= e($_SERVER['REQUEST_URI']) ?>">
+                <select name="status" class="tag <?= status_class($m['status']) ?>" onchange="this.form.submit()" onclick="event.stopPropagation()">
+                    <?php foreach (['open','in_behandeling','afgehandeld','geannuleerd'] as $s): ?>
+                        <option value="<?= $s ?>" <?= $m['status'] === $s ? 'selected' : '' ?>><?= status_label($s) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+        </div>
     <?php endforeach; ?>
 </div>
 

@@ -389,6 +389,17 @@ include __DIR__ . '/includes/header.php';
                     <?php endif; ?>
                     <p><?= e($p['inhoud']) ?></p>
 
+                    <?php $protocol_links = get_protocol_links($pdo, $p['id']); ?>
+                    <?php if ($protocol_links): ?>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                            <?php foreach ($protocol_links as $link): ?>
+                                <a href="<?= e($link['url']) ?>" target="_blank" rel="noopener" class="btn btn-small" style="text-decoration:none;">
+                                    <?= e($link['label']) ?> &#8599;
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
                     <?php $subtaken = get_subtaken_met_status($pdo, $p['id'], $id); ?>
                     <?php if ($subtaken): ?>
                         <?php

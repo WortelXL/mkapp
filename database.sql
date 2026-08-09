@@ -92,6 +92,20 @@ CREATE TABLE IF NOT EXISTS protocol_subtaken (
     FOREIGN KEY (protocol_id) REFERENCES protocollen(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Externe verwijzingen (hyperlinks) bij een protocol, bv. naar een
+-- draaiboek, plattegrond of ander naslagdocument. Knoptekst is per protocol
+-- vrij te kiezen. Maximaal 5 per protocol (afgedwongen in de beheer-UI,
+-- niet in de database).
+CREATE TABLE IF NOT EXISTS protocol_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    protocol_id INT NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    volgorde INT NOT NULL DEFAULT 0,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (protocol_id) REFERENCES protocollen(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS meldingen (
     id INT AUTO_INCREMENT PRIMARY KEY,
     meld_id VARCHAR(20) NOT NULL UNIQUE,
