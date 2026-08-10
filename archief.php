@@ -112,6 +112,7 @@ $totaal_afgehandeld = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE st
 $totaal_geannuleerd = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'geannuleerd'")->fetchColumn();
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
+$subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
 $alle_labels = get_labels($pdo);
 
 $actief = 'archief';
@@ -184,29 +185,68 @@ include __DIR__ . '/includes/header.php';
             <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
         <?php endforeach; ?>
     </select>
+    <select name="sub">
+        <option value="">Alle subclassificaties</option>
+        <?php foreach ($hoofdclassificaties as $h): ?>
+            <?php $subs = $subs_per_hoofd[$h['id']] ?? []; ?>
+            <?php if ($subs): ?>
+                <optgroup label="<?= e($h['naam']) ?>">
+                    <?php foreach ($subs as $s): ?>
+                        <option value="<?= $s['id'] ?>" <?= $f_sub == $s['id'] ? 'selected' : '' ?>><?= e($s['naam']) ?></option>
+                    <?php endforeach; ?>
+                </optgroup>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </select>
     <select name="label">
         <option value="">Alle labels</option>
         <?php foreach ($alle_labels as $l): ?>
             <option value="<?= $l['id'] ?>" <?= $f_label == $l['id'] ? 'selected' : '' ?>><?= e($l['naam']) ?></option>
         <?php endforeach; ?>
     </select>
-    <?php if ($f_sub): ?>
-        <input type="hidden" name="sub" value="<?= (int) $f_sub ?>">
-    <?php endif; ?>
     <button type="submit" class="btn btn-small">Filteren</button>
     <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_label || $f_zoek): ?>
         <a href="/archief.php" class="btn btn-small">Wissen</a>
     <?php endif; ?>
 </form>
 
+<div class="panel" style="padding:16px 20px; margin-bottom:18px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+            <p style="margin:0 0 2px; font-weight:600; font-size:13.5px;">Exporteren</p>
+            <p style="margin:0; color:var(--muted); font-size:12px;">Alle huidige filters (categorie, prioriteit, label, status, zoekterm) worden meegenomen.</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a href="/export.php?<?= http_build_query(array_merge($_GET, ['formaat' => 'csv'])) ?>" class="btn btn-small">Exporteer gefilterd als CSV</a>
+            <a href="/export.php?<?= http_build_query(array_merge($_GET, ['formaat' => 'pdf'])) ?>" class="btn btn-small">Exporteer gefilterd als PDF</a>
+        </div>
+    </div>
+</div>
+
+<form method="post" action="/export.php" id="export-selectie-form">
 <div class="melding-list">
     <?php if (!$meldingen): ?>
         <div class="empty">Geen afgeronde meldingen gevonden. Pas de filters aan.</div>
     <?php endif; ?>
 
+    <?php if ($meldingen): ?>
+        <div style="display:flex; align-items:center; gap:8px; padding:2px 4px 4px;">
+            <input type="checkbox" id="selecteer-alles" onchange="document.querySelectorAll('.export-checkbox').forEach(function(c){ c.checked = this.checked; }, this)">
+            <label for="selecteer-alles" style="color:var(--muted); font-size:12.5px; cursor:pointer;">Alles selecteren (<?= count($meldingen) ?>)</label>
+            <span style="flex:1;"></span>
+            <button type="submit" name="formaat" value="csv" class="btn btn-small">Exporteer selectie als CSV</button>
+            <button type="submit" name="formaat" value="pdf" class="btn btn-small">Exporteer selectie als PDF</button>
+        </div>
+    <?php endif; ?>
+
     <?php foreach ($meldingen as $m): ?>
-        <a href="/melding.php?id=<?= (int) $m['id'] ?>" class="melding-row prio-<?= e($m['prioriteit']) ?>">
-            <span class="melding-id"><?= e($m['meld_id']) ?></span>
+        <div class="melding-row melding-row-selecteerbaar prio-<?= e($m['prioriteit']) ?>" onclick="if (!event.target.closest('.export-checkbox-wrap')) { window.location = '/melding.php?id=<?= (int) $m['id'] ?>'; }">
+            <span style="display:flex; align-items:center; gap:10px;">
+                <span class="export-checkbox-wrap" onclick="event.stopPropagation()">
+                    <input type="checkbox" name="ids[]" value="<?= (int) $m['id'] ?>" class="export-checkbox">
+                </span>
+                <span class="melding-id"><?= e($m['meld_id']) ?></span>
+            </span>
             <span class="melding-main">
                 <span class="titel"><?= e($m['titel']) ?></span>
                 <span class="meta">
@@ -233,14 +273,16 @@ include __DIR__ . '/includes/header.php';
             <span class="tag <?= status_class($m['status']) ?>">
                 <span class="tag-dot"></span><?= status_label($m['status']) ?>
             </span>
-        </a>
+        </div>
     <?php endforeach; ?>
 
     <?php if (count($meldingen) === $MAX_RESULTATEN): ?>
         <p style="color: var(--muted); font-size: 12.5px; text-align:center; margin-top: 8px;">
             Toont de meest recente <?= $MAX_RESULTATEN ?> resultaten. Verfijn de filters voor een specifieker overzicht.
+            "Exporteer gefilterd" gebruikt alle resultaten die aan de filters voldoen, ook als dit er meer dan <?= $MAX_RESULTATEN ?> zijn.
         </p>
     <?php endif; ?>
 </div>
+</form>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

@@ -251,6 +251,49 @@ zodat een melding die via de API of door een collega wordt aangemaakt
 vanzelf verschijnt bij iedereen die het dashboard open heeft staan —
 niemand hoeft handmatig te verversen.
 
+## Archief exporteren (CSV/PDF)
+
+Op het archief (`/archief.php`) staat een exportbalk bovenaan de lijst:
+
+- **Exporteer gefilterd** (CSV of PDF) neemt alle actieve filters mee —
+  status, hoofd-/subclassificatie, prioriteit, label en zoekterm — dus je
+  bepaalt de inhoud van het bestand door eerst de filters op de pagina in
+  te stellen. Dit werkt ook als er meer resultaten zijn dan er op het
+  scherm getoond worden (de 150-resultatenlimiet op het scherm geldt niet
+  voor de export).
+- **Exporteer selectie** (CSV of PDF) gebruikt de selectievakjes vóór elke
+  melding — vink er één of meerdere aan (of "Alles selecteren" voor de
+  hele huidige lijst) en exporteer alleen die meldingen, ongeacht de
+  filters.
+
+Beide formaten bevatten dezelfde basisgegevens: meld-ID, titel, hoofd-/
+subclassificatie, prioriteit, status, locatie, gemeld door, ingevoerd
+door, laatst bijgewerkt door, tijdstippen en labels. Daarnaast bevatten
+beide ook de **omschrijving**, het **volledige logboek** (elke notitie
+met tijdstip en auteur) en de **gekoppelde protocollen** (titel + volledige
+inhoud) per melding:
+
+- De **CSV** heeft hiervoor 3 extra kolommen (Omschrijving, Logboek,
+  Protocollen) — logboekregels staan onder elkaar binnen de cel.
+- De **PDF** is geen platte tabel meer, maar een leesbaar rapport met een
+  apart blok per melding (kenmerken, statusverloop, omschrijving, logboek,
+  protocollen), met automatische regelterugloop en paginawissels waar
+  nodig.
+
+**Statusverloop & doorlooptijden.** Elke keer dat de status van een
+melding wijzigt (via de melddetailpagina, de snelle statuswijziging op
+het dashboard, of bij het aanmaken via de webinterface/API) wordt dat
+gelogd met tijdstip en wie het deed. In de export zie je daardoor per
+melding hoe lang elke status heeft geduurd (bv. "Open: 14:02 tot 14:35
+(33m)") en de totale doorlooptijd van aanmaken tot afronden. Meldingen
+die al bestonden vóórdat deze functie werd toegevoegd, hebben geen
+historische gegevens — daar tonen alleen de aanmaak- en laatst-bijgewerkt-
+tijdstippen zoals voorheen.
+
+Deze exportfunctie werkt met een eigen, lichte PDF-generator
+(`includes/minipdf.php`) zonder externe library of Composer-afhankelijkheid
+— hoeft dus niet apart geïnstalleerd te worden.
+
 ## Labels (later opvolgen)
 
 Beheerders maken labels aan via **Beheer &rarr; Labels**
@@ -279,6 +322,32 @@ dan wordt het locatieveld van de melding automatisch bijgewerkt naar de
 gevonden locatie. Exacte namen gaan voor; is er geen exacte match, dan
 wordt een gedeeltelijke match gebruikt. Matcht niets, dan gebeurt er
 stilzwijgend niets (de tekst zelf blijft gewoon staan zoals getypt).
+
+## Toewijzing: Toegewezen aan &amp; Toegewezen centralist
+
+Op de melddetailpagina, onder "Classificatie & status", staan twee
+doorzoekbare dropdowns (typen filtert de lijst):
+
+- **Toegewezen aan** — wie de melding in het veld oppakt. Gekoppeld aan de
+  **crew** (zie hieronder) — contactpersonen zonder inlog.
+- **Toegewezen centralist** — welke centralist (meldkamermedewerker) de
+  coördinatie doet. Gekoppeld aan een echt, ingelogd **gebruikers**account.
+
+Beide zijn optioneel — "— Niemand toegewezen —" laat het veld leeg.
+
+## Crew (contactpersonen zonder login)
+
+Beheer &rarr; Crew (`/admin/crew.php`) is een eenvoudige telefoonlijst:
+naam, functie en telefoonnummer, zonder dat deze mensen kunnen inloggen op
+het systeem. Bedoeld voor bijvoorbeeld EHBO'ers, beveiligers of technici
+die je aan een melding wil koppelen via "Toegewezen aan", maar die zelf
+niets in de applicatie hoeven te doen. Op de melddetailpagina is het
+telefoonnummer direct klikbaar (`tel:`-link).
+
+Elke gebruiker (die wél inlogt) kan ook een **functie** hebben (bv.
+"Centralist"), in te stellen via **Beheer &rarr; Gebruikers** — zowel bij
+het aanmaken van een nieuwe gebruiker als achteraf, inline per rij. De
+functie wordt getoond naast de naam in de "Toegewezen centralist"-dropdown.
 
 ## Persoonlijke instellingen
 

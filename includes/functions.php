@@ -335,6 +335,80 @@ function status_class(string $status): string
     ][$status] ?? '';
 }
 
+/** Logt een status in de geschiedenis van een melding (bij aanmaken of wijzigen) */
+function log_status(PDO $pdo, int $melding_id, string $status, ?int $gebruiker_id): void
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO melding_status_log (melding_id, status, gebruiker_id) VALUES (:m, :s, :g)'
+    );
+    $stmt->execute(['m' => $melding_id, 's' => $status, 'g' => $gebruiker_id]);
+}
+
+/** Haalt de statusgeschiedenis van 1 melding op, chronologisch (oud -> nieuw) */
+function get_status_geschiedenis(PDO $pdo, int $melding_id): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT sl.*, g.naam AS gebruiker_naam FROM melding_status_log sl
+         LEFT JOIN gebruikers g ON g.id = sl.gebruiker_id
+         WHERE sl.melding_id = :m ORDER BY sl.aangemaakt_op ASC'
+    );
+    $stmt->execute(['m' => $melding_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Zet de statusgeschiedenis om in tijdvakken met duur, bv.
+ * [['status'=>'open','van'=>DateTime,'tot'=>DateTime,'duur_seconden'=>1234], ...]
+ * Het laatste tijdvak loopt door tot nu (nog actief) of tot het laatste
+ * bekende tijdstip (afgehandeld/geannuleerd, dan is 'tot' die eindtijd).
+ */
+function bereken_status_tijdvakken(array $geschiedenis, string $huidige_status, string $laatst_bijgewerkt): array
+{
+    if (!$geschiedenis) {
+        return [];
+    }
+    $tijdvakken = [];
+    $aantal = count($geschiedenis);
+    for ($i = 0; $i < $aantal; $i++) {
+        $van = new DateTime($geschiedenis[$i]['aangemaakt_op']);
+        if ($i + 1 < $aantal) {
+            $tot = new DateTime($geschiedenis[$i + 1]['aangemaakt_op']);
+        } elseif (in_array($geschiedenis[$i]['status'], ['afgehandeld', 'geannuleerd'], true)) {
+            $tot = new DateTime($laatst_bijgewerkt);
+        } else {
+            $tot = new DateTime(); // nog actief: loopt door tot nu
+        }
+        $tijdvakken[] = [
+            'status'        => $geschiedenis[$i]['status'],
+            'gebruiker'     => $geschiedenis[$i]['gebruiker_naam'],
+            'van'           => $van,
+            'tot'           => $tot,
+            'duur_seconden' => max(0, $tot->getTimestamp() - $van->getTimestamp()),
+            'lopend'        => $i + 1 === $aantal && !in_array($geschiedenis[$i]['status'], ['afgehandeld', 'geannuleerd'], true),
+        ];
+    }
+    return $tijdvakken;
+}
+
+/** Formatteert een duur in seconden als "2u 15m" / "45m" / "3d 4u" */
+function format_duur(int $seconden): string
+{
+    if ($seconden < 60) {
+        return $seconden . 's';
+    }
+    $dagen = intdiv($seconden, 86400);
+    $uren = intdiv($seconden % 86400, 3600);
+    $minuten = intdiv($seconden % 3600, 60);
+
+    if ($dagen > 0) {
+        return $dagen . 'd ' . $uren . 'u';
+    }
+    if ($uren > 0) {
+        return $uren . 'u ' . $minuten . 'm';
+    }
+    return $minuten . 'm';
+}
+
 function prioriteit_label(string $prioriteit): string
 {
     return [
@@ -477,6 +551,20 @@ function bereken_melding_titel(PDO $pdo, ?int $hoofd_id, ?int $sub_id): string
     }
 
     return $hoofd_naam;
+}
+
+/** Crewleden (contactpersonen zonder login), voor de "Toegewezen aan"-dropdown */
+function get_crew(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM crew ORDER BY naam ASC')->fetchAll();
+}
+
+/** Actieve gebruikers, voor de toewijzingsdropdowns (Toegewezen aan / Toegewezen centralist) */
+function get_toewijsbare_gebruikers(PDO $pdo): array
+{
+    return $pdo->query(
+        "SELECT id, naam, functie FROM gebruikers WHERE actief = 1 ORDER BY naam ASC"
+    )->fetchAll();
 }
 
 function huidige_gebruiker_instellingen(PDO $pdo): array

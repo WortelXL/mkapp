@@ -174,6 +174,7 @@ $stmt->execute([
 ]);
 
 $nieuwe_melding_id = (int) $pdo->lastInsertId();
+log_status($pdo, $nieuwe_melding_id, $status, $gebruiker['id']);
 koppel_protocollen_automatisch($pdo, $nieuwe_melding_id, $sub_id);
 $gekoppelde_protocol_titels = array_column(
     $sub_id ? protocollen_voor_subclassificatie($pdo, $sub_id) : [],

@@ -19,10 +19,22 @@ CREATE TABLE IF NOT EXISTS gebruikers (
     wachtwoord_hash VARCHAR(255) NOT NULL,
     naam VARCHAR(100) NOT NULL,
     rol ENUM('beheerder','medewerker','view') NOT NULL DEFAULT 'medewerker',
+    functie VARCHAR(100) DEFAULT NULL,
     actief TINYINT(1) NOT NULL DEFAULT 1,
     api_token VARCHAR(64) DEFAULT NULL UNIQUE,
     auto_refresh_seconden INT NOT NULL DEFAULT 20,
     geluid_nieuwe_melding TINYINT(1) NOT NULL DEFAULT 1,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Crew: contactpersonen (naam, functie, telefoonnummer) die geen account
+-- of login hebben, maar wel aan een melding toegewezen kunnen worden
+-- (via "Toegewezen aan"). Een soort telefoonlijst, geen gebruikers.
+CREATE TABLE IF NOT EXISTS crew (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    naam VARCHAR(100) NOT NULL,
+    functie VARCHAR(100) DEFAULT NULL,
+    telefoonnummer VARCHAR(30) DEFAULT NULL,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -118,6 +130,9 @@ CREATE TABLE IF NOT EXISTS meldingen (
     status ENUM('open','in_behandeling','afgehandeld','geannuleerd') NOT NULL DEFAULT 'open',
     gemeld_door VARCHAR(100) DEFAULT NULL,
     toegewezen_aan VARCHAR(100) DEFAULT NULL,
+    toegewezen_aan_gebruiker_id INT DEFAULT NULL,
+    toegewezen_aan_crew_id INT DEFAULT NULL,
+    toegewezen_centralist_id INT DEFAULT NULL,
     aangemaakt_door_id INT DEFAULT NULL,
     bijgewerkt_door_id INT DEFAULT NULL,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -125,7 +140,10 @@ CREATE TABLE IF NOT EXISTS meldingen (
     FOREIGN KEY (hoofdclassificatie_id) REFERENCES hoofdclassificaties(id) ON DELETE SET NULL,
     FOREIGN KEY (subclassificatie_id) REFERENCES subclassificaties(id) ON DELETE SET NULL,
     FOREIGN KEY (aangemaakt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
-    FOREIGN KEY (bijgewerkt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL
+    FOREIGN KEY (bijgewerkt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
+    FOREIGN KEY (toegewezen_aan_gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
+    FOREIGN KEY (toegewezen_aan_crew_id) REFERENCES crew(id) ON DELETE SET NULL,
+    FOREIGN KEY (toegewezen_centralist_id) REFERENCES gebruikers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS melding_protocollen (
@@ -169,6 +187,19 @@ CREATE TABLE IF NOT EXISTS melding_subtaak_status (
     FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
     FOREIGN KEY (subtaak_id) REFERENCES protocol_subtaken(id) ON DELETE CASCADE,
     FOREIGN KEY (afgevinkt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Logt elke status die een melding ooit heeft gehad (incl. de status bij
+-- aanmaken), met tijdstip. Zo is te herleiden hoe lang een melding in elke
+-- status heeft gestaan (bv. in het PDF-/CSV-exportrapport).
+CREATE TABLE IF NOT EXISTS melding_status_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    melding_id INT NOT NULL,
+    status ENUM('open','in_behandeling','afgehandeld','geannuleerd') NOT NULL,
+    gebruiker_id INT DEFAULT NULL,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
+    FOREIGN KEY (gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Enkele voorbeeld hoofd- en subclassificaties

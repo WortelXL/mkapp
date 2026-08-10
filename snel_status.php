@@ -30,6 +30,10 @@ $terug      = veilig_terug_pad($_POST['terug'] ?? '/index.php');
 
 $geldige_statussen = ['open', 'in_behandeling', 'afgehandeld', 'geannuleerd'];
 if ($melding_id > 0 && in_array($status, $geldige_statussen, true)) {
+    $huidige_stmt = $pdo->prepare('SELECT status FROM meldingen WHERE id = :id');
+    $huidige_stmt->execute(['id' => $melding_id]);
+    $huidige_status = $huidige_stmt->fetchColumn();
+
     $stmt = $pdo->prepare(
         'UPDATE meldingen SET status = :status, bijgewerkt_door_id = :gebruiker WHERE id = :id'
     );
@@ -38,6 +42,9 @@ if ($melding_id > 0 && in_array($status, $geldige_statussen, true)) {
         'gebruiker' => $_SESSION['gebruiker_id'],
         'id'        => $melding_id,
     ]);
+    if ($huidige_status !== false && $status !== $huidige_status) {
+        log_status($pdo, $melding_id, $status, $_SESSION['gebruiker_id']);
+    }
 }
 
 header('Location: ' . $terug);

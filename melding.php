@@ -6,12 +6,16 @@ $pdo = get_pdo();
 $id = (int) ($_GET['id'] ?? 0);
 $melding_stmt = $pdo->prepare(
     'SELECT m.*, h.naam AS hoofd_naam, h.kleur AS hoofd_kleur, s.naam AS sub_naam,
-            g1.naam AS aangemaakt_door_naam, g2.naam AS bijgewerkt_door_naam
+            g1.naam AS aangemaakt_door_naam, g2.naam AS bijgewerkt_door_naam,
+            c.naam AS toegewezen_aan_naam, c.functie AS toegewezen_aan_functie, c.telefoonnummer AS toegewezen_aan_telefoon,
+            g4.naam AS toegewezen_centralist_naam, g4.functie AS toegewezen_centralist_functie
      FROM meldingen m
      LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
      LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
      LEFT JOIN gebruikers g1 ON g1.id = m.aangemaakt_door_id
      LEFT JOIN gebruikers g2 ON g2.id = m.bijgewerkt_door_id
+     LEFT JOIN crew c ON c.id = m.toegewezen_aan_crew_id
+     LEFT JOIN gebruikers g4 ON g4.id = m.toegewezen_centralist_id
      WHERE m.id = :id'
 );
 $melding_stmt->execute(['id' => $id]);
@@ -58,19 +62,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($actie === 'status_bijwerken') {
         $status      = $_POST['status'] ?? $melding['status'];
         $prioriteit  = $_POST['prioriteit'] ?? $melding['prioriteit'];
-        $toegewezen  = trim($_POST['toegewezen_aan'] ?? '');
+        $toegewezen_aan_crew_id = $_POST['toegewezen_aan_crew_id'] !== '' ? (int) $_POST['toegewezen_aan_crew_id'] : null;
+        $toegewezen_centralist_id = $_POST['toegewezen_centralist_id'] !== '' ? (int) $_POST['toegewezen_centralist_id'] : null;
         if (in_array($status, ['open','in_behandeling','afgehandeld','geannuleerd'], true)
             && in_array($prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
             $stmt = $pdo->prepare(
-                'UPDATE meldingen SET status = :status, prioriteit = :prioriteit, toegewezen_aan = :toegewezen, bijgewerkt_door_id = :gebruiker WHERE id = :id'
+                'UPDATE meldingen SET status = :status, prioriteit = :prioriteit,
+                    toegewezen_aan_crew_id = :toegewezen_aan, toegewezen_centralist_id = :centralist,
+                    bijgewerkt_door_id = :gebruiker WHERE id = :id'
             );
             $stmt->execute([
-                'status'      => $status,
-                'prioriteit'  => $prioriteit,
-                'toegewezen'  => $toegewezen ?: null,
-                'gebruiker'   => $_SESSION['gebruiker_id'],
-                'id'          => $id,
+                'status'       => $status,
+                'prioriteit'   => $prioriteit,
+                'toegewezen_aan' => $toegewezen_aan_crew_id,
+                'centralist'   => $toegewezen_centralist_id,
+                'gebruiker'    => $_SESSION['gebruiker_id'],
+                'id'           => $id,
             ]);
+            if ($status !== $melding['status']) {
+                log_status($pdo, $id, $status, $_SESSION['gebruiker_id']);
+            }
         }
         header('Location: /melding.php?id=' . $id . '&bijgewerkt=1');
         exit;
@@ -178,6 +189,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
 $gekoppelde_labels = get_labels_voor_melding($pdo, $id);
+$toewijsbare_gebruikers = get_toewijsbare_gebruikers($pdo);
+$crew_lijst = get_crew($pdo);
 $gekoppelde_label_ids = array_column($gekoppelde_labels, 'id');
 $alle_labels = get_labels($pdo);
 $beschikbare_labels = array_filter($alle_labels, fn($l) => !in_array($l['id'], $gekoppelde_label_ids, true));
@@ -255,6 +268,8 @@ include __DIR__ . '/includes/header.php';
     <div class="kv"><div class="k">Hoofdclassificatie</div><div class="v"><?= e($melding['hoofd_naam'] ?: '—') ?></div></div>
     <div class="kv"><div class="k">Subclassificatie</div><div class="v"><?= e($melding['sub_naam'] ?: '—') ?></div></div>
     <div class="kv"><div class="k">Gemeld door</div><div class="v"><?= e($melding['gemeld_door'] ?: '—') ?></div></div>
+    <div class="kv"><div class="k">Toegewezen aan</div><div class="v"><?= e($melding['toegewezen_aan_naam'] ?: '—') ?><?= $melding['toegewezen_aan_functie'] ? ' <span style="color:var(--muted); font-size:12px;">(' . e($melding['toegewezen_aan_functie']) . ')</span>' : '' ?><?= $melding['toegewezen_aan_telefoon'] ? '<br><a href="tel:' . e(preg_replace('/[^0-9+]/', '', $melding['toegewezen_aan_telefoon'])) . '" style="color:var(--amber); font-size:12px;">' . e($melding['toegewezen_aan_telefoon']) . '</a>' : '' ?></div></div>
+    <div class="kv"><div class="k">Toegewezen centralist</div><div class="v"><?= e($melding['toegewezen_centralist_naam'] ?: '—') ?><?= $melding['toegewezen_centralist_functie'] ? ' <span style="color:var(--muted); font-size:12px;">(' . e($melding['toegewezen_centralist_functie']) . ')</span>' : '' ?></div></div>
     <div class="kv"><div class="k">Aangemaakt</div><div class="v"><?= (new DateTime($melding['aangemaakt_op']))->format('d-m-Y H:i') ?></div></div>
     <div class="kv"><div class="k">Ingevoerd door</div><div class="v"><?= e($melding['aangemaakt_door_naam'] ?: 'onbekend') ?></div></div>
     <div class="kv"><div class="k">Laatst bijgewerkt door</div><div class="v"><?= e($melding['bijgewerkt_door_naam'] ?: '—') ?></div></div>
@@ -346,9 +361,42 @@ include __DIR__ . '/includes/header.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="field full">
-                    <label for="toegewezen_aan">Toegewezen aan</label>
-                    <input type="text" id="toegewezen_aan" name="toegewezen_aan" value="<?= e($melding['toegewezen_aan'] ?? '') ?>" placeholder="Naam / team dat de melding oppakt">
+                <div class="field">
+                    <label for="toegewezen_aan_zoek">Toegewezen aan</label>
+                    <div class="combo-search" data-combo="toegewezen_aan">
+                        <input type="text" id="toegewezen_aan_zoek" class="combo-input" autocomplete="off" placeholder="Zoek crewlid..."
+                               value="<?= $melding['toegewezen_aan_naam'] ? e($melding['toegewezen_aan_naam']) . ($melding['toegewezen_aan_functie'] ? ' (' . e($melding['toegewezen_aan_functie']) . ')' : '') : '' ?>">
+                        <input type="hidden" name="toegewezen_aan_crew_id" class="combo-value" value="<?= (int) ($melding['toegewezen_aan_crew_id'] ?? 0) ?: '' ?>">
+                        <div class="combo-opties" hidden>
+                            <div class="combo-optie combo-optie-leeg" data-id="" data-zoek="">— Niemand toegewezen —</div>
+                            <?php foreach ($crew_lijst as $c): ?>
+                                <div class="combo-optie" data-id="<?= $c['id'] ?>" data-naam="<?= e($c['naam']) ?><?= $c['functie'] ? ' (' . e($c['functie']) . ')' : '' ?>" data-zoek="<?= e(mb_strtolower($c['naam'] . ' ' . ($c['functie'] ?? ''))) ?>">
+                                    <span><?= e($c['naam']) ?></span>
+                                    <?php if ($c['functie']): ?><span class="combo-functie"><?= e($c['functie']) ?></span><?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                            <?php if (!$crew_lijst): ?>
+                                <div class="combo-geen-resultaat">Nog geen crew aangemaakt. Ga naar Beheer &rarr; Crew.</div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="toegewezen_centralist_zoek">Toegewezen centralist</label>
+                    <div class="combo-search" data-combo="toegewezen_centralist">
+                        <input type="text" id="toegewezen_centralist_zoek" class="combo-input" autocomplete="off" placeholder="Zoek gebruiker..."
+                               value="<?= $melding['toegewezen_centralist_naam'] ? e($melding['toegewezen_centralist_naam']) . ($melding['toegewezen_centralist_functie'] ? ' (' . e($melding['toegewezen_centralist_functie']) . ')' : '') : '' ?>">
+                        <input type="hidden" name="toegewezen_centralist_id" class="combo-value" value="<?= (int) ($melding['toegewezen_centralist_id'] ?? 0) ?: '' ?>">
+                        <div class="combo-opties" hidden>
+                            <div class="combo-optie combo-optie-leeg" data-id="" data-zoek="">— Geen centralist toegewezen —</div>
+                            <?php foreach ($toewijsbare_gebruikers as $g): ?>
+                                <div class="combo-optie" data-id="<?= $g['id'] ?>" data-naam="<?= e($g['naam']) ?><?= $g['functie'] ? ' (' . e($g['functie']) . ')' : '' ?>" data-zoek="<?= e(mb_strtolower($g['naam'] . ' ' . ($g['functie'] ?? ''))) ?>">
+                                    <span><?= e($g['naam']) ?></span>
+                                    <?php if ($g['functie']): ?><span class="combo-functie"><?= e($g['functie']) ?></span><?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                 </div>
                 <div class="actions full">
                     <button type="submit" class="btn btn-primary">Status opslaan</button>
@@ -478,6 +526,44 @@ function vulSubclassificaties2() {
 
 hoofdSelect2.addEventListener('change', vulSubclassificaties2);
 vulSubclassificaties2();
+
+// Doorzoekbare gebruikers-dropdown (combobox) voor "Toegewezen aan" en
+// "Toegewezen centralist". Typen filtert de lijst; klikken op een optie
+// zet zowel de zichtbare tekst als het verborgen ID-veld dat echt wordt
+// opgeslagen.
+(function () {
+    document.querySelectorAll('.combo-search').forEach(function (container) {
+        const input = container.querySelector('.combo-input');
+        const hidden = container.querySelector('.combo-value');
+        const opties = container.querySelector('.combo-opties');
+        const alleOpties = Array.from(opties.querySelectorAll('.combo-optie'));
+
+        function toonOpties() {
+            const zoekterm = input.value.trim().toLowerCase();
+            alleOpties.forEach(function (optie) {
+                const match = optie.classList.contains('combo-optie-leeg')
+                    || optie.dataset.zoek.includes(zoekterm);
+                optie.hidden = !match;
+            });
+            opties.hidden = false;
+        }
+
+        input.addEventListener('focus', toonOpties);
+        input.addEventListener('input', toonOpties);
+        input.addEventListener('blur', function () {
+            setTimeout(function () { opties.hidden = true; }, 150);
+        });
+
+        alleOpties.forEach(function (optie) {
+            optie.addEventListener('mousedown', function (e) {
+                e.preventDefault(); // voorkomt dat blur eerder vuurt dan de klik
+                hidden.value = optie.dataset.id || '';
+                input.value = optie.classList.contains('combo-optie-leeg') ? '' : optie.dataset.naam;
+                opties.hidden = true;
+            });
+        });
+    });
+})();
 
 // Enter slaat de notitie meteen op (Shift+Enter voegt een nieuwe regel toe
 // binnen dezelfde notitie, zoals in de meeste chatprogramma's).

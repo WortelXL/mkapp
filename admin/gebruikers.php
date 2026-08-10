@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gebruikersnaam = trim($_POST['gebruikersnaam'] ?? '');
         $wachtwoord     = $_POST['wachtwoord'] ?? '';
         $rol            = $_POST['rol'] ?? 'medewerker';
+        $functie        = trim($_POST['functie'] ?? '');
 
         if ($naam === '' || $gebruikersnaam === '' || $wachtwoord === '') {
             $fout = 'Vul naam, gebruikersnaam en wachtwoord in.';
@@ -31,13 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $stmt = $pdo->prepare(
-                    'INSERT INTO gebruikers (gebruikersnaam, wachtwoord_hash, naam, rol) VALUES (:u, :p, :n, :r)'
+                    'INSERT INTO gebruikers (gebruikersnaam, wachtwoord_hash, naam, rol, functie) VALUES (:u, :p, :n, :r, :f)'
                 );
                 $stmt->execute([
                     'u' => $gebruikersnaam,
                     'p' => password_hash($wachtwoord, PASSWORD_DEFAULT),
                     'n' => $naam,
                     'r' => $rol,
+                    'f' => $functie ?: null,
                 ]);
                 $succes = 'Gebruiker "' . $naam . '" is aangemaakt.';
             } catch (PDOException $e) {
@@ -96,6 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['id' => $id]);
             $succes = 'Gebruiker verwijderd.';
         }
+    }
+
+    if ($actie === 'functie_wijzigen') {
+        $id      = (int) ($_POST['id'] ?? 0);
+        $functie = trim($_POST['functie'] ?? '');
+        $stmt = $pdo->prepare('UPDATE gebruikers SET functie = :f WHERE id = :id');
+        $stmt->execute(['f' => $functie ?: null, 'id' => $id]);
+        $succes = 'Functie bijgewerkt.';
     }
 
     if ($actie === 'wachtwoord_wijzigen') {
@@ -201,6 +211,10 @@ include __DIR__ . '/../includes/header.php';
                 <option value="view">Viewer (alleen Overview)</option>
             </select>
         </div>
+        <div class="field">
+            <label for="functie">Functie (optioneel)</label>
+            <input type="text" id="functie" name="functie" placeholder="bv. Centralist, Hoofd EHBO">
+        </div>
         <div class="actions full">
             <button type="submit" class="btn btn-primary">Gebruiker aanmaken</button>
         </div>
@@ -211,7 +225,7 @@ include __DIR__ . '/../includes/header.php';
     <h2>Bestaande gebruikers</h2>
     <table class="admin-table">
         <thead>
-            <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th>Status</th><th>Wachtwoord</th><th>API-token (Stream Deck e.d.)</th><th></th></tr>
+            <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th>Functie</th><th>Status</th><th>Wachtwoord</th><th>API-token (Stream Deck e.d.)</th><th></th></tr>
         </thead>
         <tbody>
         <?php foreach ($gebruikers as $g): ?>
@@ -227,6 +241,14 @@ include __DIR__ . '/../includes/header.php';
                             <option value="beheerder" <?= $g['rol'] === 'beheerder' ? 'selected' : '' ?>>Beheerder</option>
                             <option value="view" <?= $g['rol'] === 'view' ? 'selected' : '' ?>>Viewer</option>
                         </select>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" style="display:flex; gap:4px;">
+                        <input type="hidden" name="actie" value="functie_wijzigen">
+                        <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                        <input type="text" name="functie" value="<?= e($g['functie'] ?? '') ?>" placeholder="bv. Centralist" style="width:120px; font-size:12.5px; padding:5px 7px;">
+                        <button type="submit" class="btn btn-small">Opslaan</button>
                     </form>
                 </td>
                 <td>

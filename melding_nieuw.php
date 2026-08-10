@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'aangemaakt_door_id' => $_SESSION['gebruiker_id'],
         ]);
         $nieuwe_melding_id = (int) $pdo->lastInsertId();
+        log_status($pdo, $nieuwe_melding_id, 'open', $_SESSION['gebruiker_id']);
         koppel_protocollen_automatisch($pdo, $nieuwe_melding_id, $subclassificatie_id);
         header('Location: /melding.php?id=' . $nieuwe_melding_id . '&aangemaakt=1');
         exit;

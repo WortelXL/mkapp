@@ -310,6 +310,10 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
 .melding-row.prio-normaal { border-left-color: var(--blue); }
 .melding-row.prio-laag { border-left-color: var(--gray); }
 
+.melding-row.melding-row-selecteerbaar { grid-template-columns: 130px 1fr auto auto auto; }
+.export-checkbox-wrap { cursor: default; display: inline-flex; }
+.export-checkbox { width: 15px; height: 15px; accent-color: var(--amber); cursor: pointer; }
+
 .status-form { margin: 0; }
 
 /* --- Schakelaartje + inline logboek (Overview-pagina) -------------------- */
@@ -604,6 +608,101 @@ input:focus, select:focus, textarea:focus {
     color: var(--muted);
     text-decoration: line-through;
 }
+/* --- Beheer: lijstweergave i.p.v. kaarten -------------------------------- */
+.beheer-lijst-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+    transition: padding-left 0.15s;
+}
+.beheer-lijst-item:last-child { border-bottom: none; }
+.beheer-lijst-item:hover { padding-left: 8px; }
+.beheer-lijst-titel {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+}
+.beheer-lijst-aantal {
+    color: var(--muted);
+    font-weight: 400;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+.beheer-lijst-omschrijving {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 3px;
+    max-width: 640px;
+}
+.beheer-lijst-pijl {
+    color: var(--amber);
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* --- Doorzoekbare gebruikers-dropdown (combobox) ------------------------ */
+.combo-search {
+    position: relative;
+}
+.combo-input {
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+}
+.combo-input:focus {
+    outline: none;
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(245,165,36,0.15);
+}
+.combo-opties {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.combo-optie {
+    padding: 9px 12px;
+    font-size: 13.5px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.combo-optie:hover, .combo-optie.combo-actief {
+    background: var(--panel);
+}
+.combo-optie-leeg { color: var(--muted); }
+.combo-functie {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+.combo-geen-resultaat {
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--muted);
+    font-style: italic;
+}
+
 .subtaak-meta {
     font-size: 11px;
     color: var(--muted);

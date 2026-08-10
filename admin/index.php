@@ -7,17 +7,63 @@ $aantal_hoofdclassificaties = (int) $pdo->query('SELECT COUNT(*) FROM hoofdclass
 $aantal_protocollen = (int) $pdo->query('SELECT COUNT(*) FROM protocollen')->fetchColumn();
 $aantal_meldingen    = (int) $pdo->query('SELECT COUNT(*) FROM meldingen')->fetchColumn();
 $aantal_gebruikers   = (int) $pdo->query('SELECT COUNT(*) FROM gebruikers')->fetchColumn();
+$aantal_crew         = (int) $pdo->query('SELECT COUNT(*) FROM crew')->fetchColumn();
 
 $actief = 'admin';
 $paginatitel = 'Beheer';
 include __DIR__ . '/../includes/header.php';
+
+$onderdelen = [
+    [
+        'titel' => 'Gebruikers',
+        'omschrijving' => 'Accounts voor je team (beheerder/medewerker/viewer), functie, wachtwoorden en API-tokens.',
+        'link' => '/admin/gebruikers.php',
+        'aantal' => $aantal_gebruikers,
+    ],
+    [
+        'titel' => 'Crew',
+        'omschrijving' => 'Contactpersonen zonder login (naam, functie, telefoonnummer) — koppelbaar aan "Toegewezen aan" op een melding.',
+        'link' => '/admin/crew.php',
+        'aantal' => $aantal_crew,
+    ],
+    [
+        'titel' => 'Classificaties',
+        'omschrijving' => 'Hoofd- en subclassificaties waarmee meldingen ingedeeld worden.',
+        'link' => '/admin/classificaties.php',
+        'aantal' => $aantal_hoofdclassificaties,
+    ],
+    [
+        'titel' => 'Protocollen',
+        'omschrijving' => 'Standaardprocedures (met subtaken en naslaglinks) die aan meldingen gekoppeld kunnen worden.',
+        'link' => '/admin/protocollen.php',
+        'aantal' => $aantal_protocollen,
+    ],
+    [
+        'titel' => 'Locaties',
+        'omschrijving' => 'Vooraf ingestelde locaties, oproepbaar met ;naam in omschrijving/notities.',
+        'link' => '/admin/locaties.php',
+        'aantal' => null,
+    ],
+    [
+        'titel' => 'Labels',
+        'omschrijving' => 'Labels om meldingen te markeren voor latere opvolging, ook in het archief.',
+        'link' => '/admin/labels.php',
+        'aantal' => null,
+    ],
+    [
+        'titel' => 'Instellingen',
+        'omschrijving' => 'Naam, startdatum en aantal dagen van het evenement, en het archief leegmaken.',
+        'link' => '/admin/instellingen.php',
+        'aantal' => null,
+    ],
+];
 ?>
 
 <div class="page-head">
     <div>
         <p class="eyebrow">Beheer</p>
         <h1>Welkom, <?= e(huidige_gebruiker_naam()) ?></h1>
-        <p>Beheer gebruikers, classificaties en protocollen voor de meldkamer.</p>
+        <p>Beheer gebruikers, crew, classificaties en protocollen voor de meldkamer.</p>
     </div>
 </div>
 
@@ -31,8 +77,8 @@ include __DIR__ . '/../includes/header.php';
         <div class="lbl">Gebruikers</div>
     </div>
     <div class="board-cell">
-        <div class="num c-muted"><?= $aantal_hoofdclassificaties ?></div>
-        <div class="lbl">Hoofdclassificaties</div>
+        <div class="num c-muted"><?= $aantal_crew ?></div>
+        <div class="lbl">Crew</div>
     </div>
     <div class="board-cell">
         <div class="num c-muted"><?= $aantal_protocollen ?></div>
@@ -40,37 +86,16 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<div class="form-grid">
-    <div class="panel">
-        <h2>Gebruikers</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Voeg accounts toe voor je team, met de rol beheerder of medewerker.</p>
-        <a href="/admin/gebruikers.php" class="btn btn-primary">Gebruikers beheren</a>
-    </div>
-    <div class="panel">
-        <h2>Classificaties</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Beheer hoofd- en subclassificaties waarmee meldingen ingedeeld worden.</p>
-        <a href="/admin/classificaties.php" class="btn btn-primary">Classificaties beheren</a>
-    </div>
-    <div class="panel">
-        <h2>Protocollen</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Beheer standaardprocedures die aan meldingen gekoppeld kunnen worden.</p>
-        <a href="/admin/protocollen.php" class="btn btn-primary">Protocollen beheren</a>
-    </div>
-    <div class="panel">
-        <h2>Instellingen</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Naam, startdatum en aantal dagen van het evenement.</p>
-        <a href="/admin/instellingen.php" class="btn btn-primary">Instellingen beheren</a>
-    </div>
-    <div class="panel">
-        <h2>Locaties</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Vooraf ingestelde locaties, oproepbaar met ;naam in omschrijving/notities.</p>
-        <a href="/admin/locaties.php" class="btn btn-primary">Locaties beheren</a>
-    </div>
-    <div class="panel">
-        <h2>Labels</h2>
-        <p style="color:var(--muted); margin-top:-8px;">Labels om meldingen te markeren voor latere opvolging, ook in het archief.</p>
-        <a href="/admin/labels.php" class="btn btn-primary">Labels beheren</a>
-    </div>
+<div class="panel" style="padding:8px 20px;">
+    <?php foreach ($onderdelen as $o): ?>
+        <a href="<?= e($o['link']) ?>" class="beheer-lijst-item">
+            <div>
+                <div class="beheer-lijst-titel"><?= e($o['titel']) ?><?= $o['aantal'] !== null ? ' <span class="beheer-lijst-aantal">(' . $o['aantal'] . ')</span>' : '' ?></div>
+                <div class="beheer-lijst-omschrijving"><?= e($o['omschrijving']) ?></div>
+            </div>
+            <span class="beheer-lijst-pijl">&rarr;</span>
+        </a>
+    <?php endforeach; ?>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
