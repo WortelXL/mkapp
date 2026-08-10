@@ -134,6 +134,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($actie === 'taak_toevoegen') {
+        $omschrijving = trim($_POST['omschrijving'] ?? '');
+        if ($omschrijving !== '') {
+            $volgorde_stmt = $pdo->prepare('SELECT COALESCE(MAX(volgorde), 0) + 1 FROM melding_taken WHERE melding_id = :m');
+            $volgorde_stmt->execute(['m' => $id]);
+            $volgende_volgorde = (int) $volgorde_stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO melding_taken (melding_id, omschrijving, aangemaakt_door_id, volgorde) VALUES (:m, :o, :g, :v)'
+            );
+            $stmt->execute(['m' => $id, 'o' => $omschrijving, 'g' => $_SESSION['gebruiker_id'], 'v' => $volgende_volgorde]);
+        }
+        header('Location: /melding.php?id=' . $id . '#taken');
+        exit;
+    }
+
+    if ($actie === 'taak_wisselen') {
+        $taak_id = (int) ($_POST['taak_id'] ?? 0);
+        $huidige_stmt = $pdo->prepare('SELECT afgevinkt FROM melding_taken WHERE id = :id AND melding_id = :m');
+        $huidige_stmt->execute(['id' => $taak_id, 'm' => $id]);
+        $huidig = $huidige_stmt->fetchColumn();
+        if ($huidig !== false) {
+            $nieuw = $huidig ? 0 : 1;
+            $stmt = $pdo->prepare(
+                'UPDATE melding_taken SET afgevinkt = :a, afgevinkt_door_id = :g, afgevinkt_op = :t WHERE id = :id'
+            );
+            $stmt->execute([
+                'a' => $nieuw,
+                'g' => $nieuw ? $_SESSION['gebruiker_id'] : null,
+                't' => $nieuw ? date('Y-m-d H:i:s') : null,
+                'id' => $taak_id,
+            ]);
+        }
+        header('Location: /melding.php?id=' . $id . '#taken');
+        exit;
+    }
+
+    if ($actie === 'taak_verwijderen') {
+        $taak_id = (int) ($_POST['taak_id'] ?? 0);
+        $stmt = $pdo->prepare('DELETE FROM melding_taken WHERE id = :id AND melding_id = :m');
+        $stmt->execute(['id' => $taak_id, 'm' => $id]);
+        header('Location: /melding.php?id=' . $id . '#taken');
+        exit;
+    }
+
     if ($actie === 'notitie_toevoegen') {
         $notitie = trim($_POST['notitie'] ?? '');
         if ($notitie !== '') {
@@ -212,6 +257,7 @@ $gekoppelde_ids = array_column($gekoppelde_protocollen, 'id');
 // beschikbare protocollen om te koppelen (nog niet gekoppeld)
 $alle_protocollen = get_protocollen($pdo);
 $beschikbare_protocollen = array_filter($alle_protocollen, fn($p) => !in_array($p['id'], $gekoppelde_ids, true));
+$losse_taken = get_losse_taken($pdo, $id);
 
 // ---- Notities / log -----------------------------------------------------
 $notities_stmt = $pdo->prepare('SELECT * FROM melding_notities WHERE melding_id = :id ORDER BY aangemaakt_op DESC');
@@ -242,6 +288,48 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<div class="info-compact">
+    <div class="info-compact-item"><div class="k">Locatie</div><div class="v"><?= e($melding['locatie'] ?: '—') ?></div></div>
+    <div class="info-compact-item"><div class="k">Hoofdclassificatie</div><div class="v"><?= e($melding['hoofd_naam'] ?: '—') ?></div></div>
+    <div class="info-compact-item"><div class="k">Subclassificatie</div><div class="v"><?= e($melding['sub_naam'] ?: '—') ?></div></div>
+    <div class="info-compact-item"><div class="k">Gemeld door</div><div class="v"><?= e($melding['gemeld_door'] ?: '—') ?></div></div>
+    <div class="info-compact-item"><div class="k">Aangemaakt</div><div class="v"><?= (new DateTime($melding['aangemaakt_op']))->format('d-m-Y H:i') ?></div></div>
+    <div class="info-compact-item"><div class="k">Toegewezen aan</div><div class="v"><?= e($melding['toegewezen_aan_naam'] ?: '—') ?><?= $melding['toegewezen_aan_functie'] ? ' <span class="v-sub">(' . e($melding['toegewezen_aan_functie']) . ')</span>' : '' ?><?= $melding['toegewezen_aan_telefoon'] ? ' <a href="tel:' . e(preg_replace('/[^0-9+]/', '', $melding['toegewezen_aan_telefoon'])) . '" class="v-sub" style="color:var(--amber);">' . e($melding['toegewezen_aan_telefoon']) . '</a>' : '' ?></div></div>
+    <div class="info-compact-item"><div class="k">Toegewezen centralist</div><div class="v"><?= e($melding['toegewezen_centralist_naam'] ?: '—') ?><?= $melding['toegewezen_centralist_functie'] ? ' <span class="v-sub">(' . e($melding['toegewezen_centralist_functie']) . ')</span>' : '' ?></div></div>
+    <div class="info-compact-item"><div class="k">Ingevoerd door</div><div class="v"><?= e($melding['aangemaakt_door_naam'] ?: 'onbekend') ?></div></div>
+    <div class="info-compact-item"><div class="k">Laatst bijgewerkt door</div><div class="v"><?= e($melding['bijgewerkt_door_naam'] ?: '—') ?></div></div>
+    <div class="info-compact-item">
+        <div class="k">Labels</div>
+        <div class="v">
+            <div style="display:flex; flex-wrap:wrap; gap:4px; <?= $gekoppelde_labels ? 'margin-bottom:5px;' : '' ?>">
+                <?php foreach ($gekoppelde_labels as $l): ?>
+                    <form method="post" style="display:inline-flex;">
+                        <input type="hidden" name="actie" value="label_ontkoppelen">
+                        <input type="hidden" name="label_id" value="<?= $l['id'] ?>">
+                        <button type="submit" class="cat-chip" style="border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; background: <?= e($l['kleur']) ?>22; color: <?= e($l['kleur']) ?>; font-family:inherit;" title="Klik om dit label te verwijderen">
+                            <?= e($l['naam']) ?> &times;
+                        </button>
+                    </form>
+                <?php endforeach; ?>
+                <?php if (!$gekoppelde_labels): ?>—<?php endif; ?>
+            </div>
+            <?php if ($beschikbare_labels): ?>
+                <form method="post">
+                    <input type="hidden" name="actie" value="label_koppelen">
+                    <select name="label_id" onchange="this.form.submit()" style="width:100%; font-size:11px; padding:3px 5px; font-family: var(--font-body);">
+                        <option value="" selected disabled>+ label toevoegen...</option>
+                        <?php foreach ($beschikbare_labels as $l): ?>
+                            <option value="<?= $l['id'] ?>"><?= e($l['naam']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+            <?php elseif (!$alle_labels): ?>
+                <a href="/admin/labels.php" style="color: var(--amber); font-size:11px;">+ label aanmaken</a>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
 <div class="panel">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
         <h2 style="margin:0;">Logboek</h2>
@@ -260,48 +348,6 @@ include __DIR__ . '/includes/header.php';
                 <div class="meta"><?= e($n['auteur'] ?: 'Onbekend') ?> · <?= (new DateTime($n['aangemaakt_op']))->format('d-m-Y H:i') ?></div>
             </div>
         <?php endforeach; ?>
-    </div>
-</div>
-
-<div class="kv-grid">
-    <div class="kv"><div class="k">Locatie</div><div class="v"><?= e($melding['locatie'] ?: '—') ?></div></div>
-    <div class="kv"><div class="k">Hoofdclassificatie</div><div class="v"><?= e($melding['hoofd_naam'] ?: '—') ?></div></div>
-    <div class="kv"><div class="k">Subclassificatie</div><div class="v"><?= e($melding['sub_naam'] ?: '—') ?></div></div>
-    <div class="kv"><div class="k">Gemeld door</div><div class="v"><?= e($melding['gemeld_door'] ?: '—') ?></div></div>
-    <div class="kv"><div class="k">Toegewezen aan</div><div class="v"><?= e($melding['toegewezen_aan_naam'] ?: '—') ?><?= $melding['toegewezen_aan_functie'] ? ' <span style="color:var(--muted); font-size:12px;">(' . e($melding['toegewezen_aan_functie']) . ')</span>' : '' ?><?= $melding['toegewezen_aan_telefoon'] ? '<br><a href="tel:' . e(preg_replace('/[^0-9+]/', '', $melding['toegewezen_aan_telefoon'])) . '" style="color:var(--amber); font-size:12px;">' . e($melding['toegewezen_aan_telefoon']) . '</a>' : '' ?></div></div>
-    <div class="kv"><div class="k">Toegewezen centralist</div><div class="v"><?= e($melding['toegewezen_centralist_naam'] ?: '—') ?><?= $melding['toegewezen_centralist_functie'] ? ' <span style="color:var(--muted); font-size:12px;">(' . e($melding['toegewezen_centralist_functie']) . ')</span>' : '' ?></div></div>
-    <div class="kv"><div class="k">Aangemaakt</div><div class="v"><?= (new DateTime($melding['aangemaakt_op']))->format('d-m-Y H:i') ?></div></div>
-    <div class="kv"><div class="k">Ingevoerd door</div><div class="v"><?= e($melding['aangemaakt_door_naam'] ?: 'onbekend') ?></div></div>
-    <div class="kv"><div class="k">Laatst bijgewerkt door</div><div class="v"><?= e($melding['bijgewerkt_door_naam'] ?: '—') ?></div></div>
-    <div class="kv">
-        <div class="k">Labels</div>
-        <div class="v">
-            <div style="display:flex; flex-wrap:wrap; gap:4px; <?= $gekoppelde_labels ? 'margin-bottom:6px;' : '' ?>">
-                <?php foreach ($gekoppelde_labels as $l): ?>
-                    <form method="post" style="display:inline-flex;">
-                        <input type="hidden" name="actie" value="label_ontkoppelen">
-                        <input type="hidden" name="label_id" value="<?= $l['id'] ?>">
-                        <button type="submit" class="cat-chip" style="border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; background: <?= e($l['kleur']) ?>22; color: <?= e($l['kleur']) ?>; font-family:inherit;" title="Klik om dit label te verwijderen">
-                            <?= e($l['naam']) ?> &times;
-                        </button>
-                    </form>
-                <?php endforeach; ?>
-                <?php if (!$gekoppelde_labels): ?>—<?php endif; ?>
-            </div>
-            <?php if ($beschikbare_labels): ?>
-                <form method="post">
-                    <input type="hidden" name="actie" value="label_koppelen">
-                    <select name="label_id" onchange="this.form.submit()" style="width:100%; font-size:11.5px; padding:4px 6px; font-family: var(--font-body);">
-                        <option value="" selected disabled>+ label toevoegen...</option>
-                        <?php foreach ($beschikbare_labels as $l): ?>
-                            <option value="<?= $l['id'] ?>"><?= e($l['naam']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-            <?php elseif (!$alle_labels): ?>
-                <a href="/admin/labels.php" style="color: var(--amber); font-size:11.5px;">+ label aanmaken</a>
-            <?php endif; ?>
-        </div>
     </div>
 </div>
 
@@ -422,81 +468,118 @@ include __DIR__ . '/includes/header.php';
         </div>
 
         <div class="panel" id="protocollen">
-            <h2>Gekoppelde protocollen</h2>
+            <h2>Protocol + Taken</h2>
 
-            <?php if (!$gekoppelde_protocollen): ?>
-                <p style="color: var(--muted); margin-top:0;">Nog geen protocollen gekoppeld aan deze melding.</p>
-            <?php endif; ?>
+            <div class="subsectie">
+                <h3>Protocol</h3>
 
-            <?php foreach ($gekoppelde_protocollen as $p): ?>
-                <div class="protocol-card">
-                    <div class="row-top">
-                        <h3><?= e($p['titel']) ?></h3>
-                        <form method="post" onsubmit="return confirm('Protocol loskoppelen van deze melding?');">
-                            <input type="hidden" name="actie" value="protocol_ontkoppelen">
-                            <input type="hidden" name="protocol_id" value="<?= $p['id'] ?>">
-                            <button type="submit" class="btn btn-small btn-danger">Loskoppelen</button>
+                <?php if ($beschikbare_protocollen): ?>
+                    <form method="post" style="display:flex; gap:10px; margin-bottom:14px;">
+                        <input type="hidden" name="actie" value="protocol_koppelen">
+                        <select name="protocol_id" style="flex:1;">
+                            <?php foreach ($beschikbare_protocollen as $p): ?>
+                                <option value="<?= $p['id'] ?>"><?= e($p['titel']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="submit" class="btn">Koppelen</button>
+                    </form>
+                <?php elseif (!$alle_protocollen): ?>
+                    <p style="color: var(--muted);">
+                        Er zijn nog geen protocollen aangemaakt. Ga naar
+                        <a href="/admin/protocollen.php" style="color: var(--amber);">Beheer &rarr; Protocollen</a> om er een toe te voegen.
+                    </p>
+                <?php endif; ?>
+
+                <?php if (!$gekoppelde_protocollen): ?>
+                    <p style="color: var(--muted); margin-top:0;">Nog geen protocollen gekoppeld aan deze melding.</p>
+                <?php endif; ?>
+
+                <?php foreach ($gekoppelde_protocollen as $p): ?>
+                    <div class="protocol-card">
+                        <div class="row-top">
+                            <h3><?= e($p['titel']) ?></h3>
+                            <form method="post" onsubmit="return confirm('Protocol loskoppelen van deze melding?');">
+                                <input type="hidden" name="actie" value="protocol_ontkoppelen">
+                                <input type="hidden" name="protocol_id" value="<?= $p['id'] ?>">
+                                <button type="submit" class="btn btn-small btn-danger">Loskoppelen</button>
+                            </form>
+                        </div>
+                        <?php if ($p['sub_naam']): ?>
+                            <p class="cat-chip" style="display:inline-block; background: <?= e($p['hoofd_kleur']) ?>22; color: <?= e($p['hoofd_kleur']) ?>; margin: 0 0 8px;">
+                                <?= e($p['hoofd_naam']) ?> &middot; <?= e($p['sub_naam']) ?>
+                            </p>
+                        <?php endif; ?>
+                        <p><?= e($p['inhoud']) ?></p>
+
+                        <?php $protocol_links = get_protocol_links($pdo, $p['id']); ?>
+                        <?php if ($protocol_links): ?>
+                            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                                <?php foreach ($protocol_links as $link): ?>
+                                    <a href="<?= e($link['url']) ?>" target="_blank" rel="noopener" class="btn btn-small" style="text-decoration:none;">
+                                        <?= e($link['label']) ?> &#8599;
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php $subtaken = get_subtaken_met_status($pdo, $p['id'], $id); ?>
+                        <?php if ($subtaken): ?>
+                            <?php
+                                $aantal_afgevinkt = count(array_filter($subtaken, fn($t) => (int) $t['afgevinkt'] === 1));
+                            ?>
+                            <div class="subtaken-blok">
+                                <p class="subtaken-kop">Subtaken (<?= $aantal_afgevinkt ?>/<?= count($subtaken) ?>)</p>
+                                <?php foreach ($subtaken as $t): ?>
+                                    <form method="post" class="subtaak-regel">
+                                        <input type="hidden" name="actie" value="subtaak_wisselen">
+                                        <input type="hidden" name="subtaak_id" value="<?= $t['id'] ?>">
+                                        <label>
+                                            <input type="checkbox" onchange="this.form.submit()" <?= $t['afgevinkt'] ? 'checked' : '' ?>>
+                                            <span class="<?= $t['afgevinkt'] ? 'afgevinkt' : '' ?>"><?= e($t['omschrijving']) ?></span>
+                                        </label>
+                                        <?php if ($t['afgevinkt'] && $t['afgevinkt_door_naam']): ?>
+                                            <span class="subtaak-meta"><?= e($t['afgevinkt_door_naam']) ?> · <?= (new DateTime($t['afgevinkt_op']))->format('d-m H:i') ?></span>
+                                        <?php endif; ?>
+                                    </form>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="subsectie" id="taken">
+                <h3>Taken</h3>
+
+                <?php if (!$losse_taken): ?>
+                    <p style="color: var(--muted); margin-top:0;">Nog geen losse taken.</p>
+                <?php endif; ?>
+                <?php foreach ($losse_taken as $t): ?>
+                    <div class="losse-taak-regel">
+                        <form method="post" style="flex:1; margin:0;">
+                            <input type="hidden" name="actie" value="taak_wisselen">
+                            <input type="hidden" name="taak_id" value="<?= $t['id'] ?>">
+                            <label>
+                                <input type="checkbox" onchange="this.form.submit()" <?= $t['afgevinkt'] ? 'checked' : '' ?>>
+                                <span class="<?= $t['afgevinkt'] ? 'afgevinkt' : '' ?>"><?= e($t['omschrijving']) ?></span>
+                            </label>
+                        </form>
+                        <?php if ($t['afgevinkt'] && $t['afgevinkt_door_naam']): ?>
+                            <span class="subtaak-meta"><?= e($t['afgevinkt_door_naam']) ?> · <?= (new DateTime($t['afgevinkt_op']))->format('d-m H:i') ?></span>
+                        <?php endif; ?>
+                        <form method="post" style="margin:0;" onsubmit="return confirm('Taak verwijderen?');">
+                            <input type="hidden" name="actie" value="taak_verwijderen">
+                            <input type="hidden" name="taak_id" value="<?= $t['id'] ?>">
+                            <button type="submit" class="btn btn-small btn-danger" title="Verwijderen">&times;</button>
                         </form>
                     </div>
-                    <?php if ($p['sub_naam']): ?>
-                        <p class="cat-chip" style="display:inline-block; background: <?= e($p['hoofd_kleur']) ?>22; color: <?= e($p['hoofd_kleur']) ?>; margin: 0 0 8px;">
-                            <?= e($p['hoofd_naam']) ?> &middot; <?= e($p['sub_naam']) ?>
-                        </p>
-                    <?php endif; ?>
-                    <p><?= e($p['inhoud']) ?></p>
-
-                    <?php $protocol_links = get_protocol_links($pdo, $p['id']); ?>
-                    <?php if ($protocol_links): ?>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                            <?php foreach ($protocol_links as $link): ?>
-                                <a href="<?= e($link['url']) ?>" target="_blank" rel="noopener" class="btn btn-small" style="text-decoration:none;">
-                                    <?= e($link['label']) ?> &#8599;
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <?php $subtaken = get_subtaken_met_status($pdo, $p['id'], $id); ?>
-                    <?php if ($subtaken): ?>
-                        <?php
-                            $aantal_afgevinkt = count(array_filter($subtaken, fn($t) => (int) $t['afgevinkt'] === 1));
-                        ?>
-                        <div class="subtaken-blok">
-                            <p class="subtaken-kop">Subtaken (<?= $aantal_afgevinkt ?>/<?= count($subtaken) ?>)</p>
-                            <?php foreach ($subtaken as $t): ?>
-                                <form method="post" class="subtaak-regel">
-                                    <input type="hidden" name="actie" value="subtaak_wisselen">
-                                    <input type="hidden" name="subtaak_id" value="<?= $t['id'] ?>">
-                                    <label>
-                                        <input type="checkbox" onchange="this.form.submit()" <?= $t['afgevinkt'] ? 'checked' : '' ?>>
-                                        <span class="<?= $t['afgevinkt'] ? 'afgevinkt' : '' ?>"><?= e($t['omschrijving']) ?></span>
-                                    </label>
-                                    <?php if ($t['afgevinkt'] && $t['afgevinkt_door_naam']): ?>
-                                        <span class="subtaak-meta"><?= e($t['afgevinkt_door_naam']) ?> · <?= (new DateTime($t['afgevinkt_op']))->format('d-m H:i') ?></span>
-                                    <?php endif; ?>
-                                </form>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            <?php endforeach; ?>
-
-            <?php if ($beschikbare_protocollen): ?>
-                <form method="post" style="display:flex; gap:10px; margin-top:14px;">
-                    <input type="hidden" name="actie" value="protocol_koppelen">
-                    <select name="protocol_id" style="flex:1;">
-                        <?php foreach ($beschikbare_protocollen as $p): ?>
-                            <option value="<?= $p['id'] ?>"><?= e($p['titel']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button type="submit" class="btn">Koppelen</button>
+                <?php endforeach; ?>
+                <form method="post" style="display:flex; gap:6px; margin-top:10px;">
+                    <input type="hidden" name="actie" value="taak_toevoegen">
+                    <input type="text" name="omschrijving" placeholder="+ taak toevoegen..." style="flex:1; font-size:12.5px; padding:5px 8px;" required>
+                    <button type="submit" class="btn btn-small">Toevoegen</button>
                 </form>
-            <?php elseif (!$alle_protocollen): ?>
-                <p style="color: var(--muted);">
-                    Er zijn nog geen protocollen aangemaakt. Ga naar
-                    <a href="/admin/protocollen.php" style="color: var(--amber);">Beheer &rarr; Protocollen</a> om er een toe te voegen.
-                </p>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>

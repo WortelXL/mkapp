@@ -267,6 +267,20 @@ function get_subtaken_met_status(PDO $pdo, int $protocol_id, int $melding_id): a
     return $stmt->fetchAll();
 }
 
+/** Losse taken van 1 melding (los van elk protocol), in de ingestelde volgorde */
+function get_losse_taken(PDO $pdo, int $melding_id): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT t.*, g.naam AS afgevinkt_door_naam
+         FROM melding_taken t
+         LEFT JOIN gebruikers g ON g.id = t.afgevinkt_door_id
+         WHERE t.melding_id = :m
+         ORDER BY t.volgorde ASC, t.id ASC'
+    );
+    $stmt->execute(['m' => $melding_id]);
+    return $stmt->fetchAll();
+}
+
 /**
  * Zoekt een hoofd-/subclassificatie op basis van een commando-tekst
  * (bv. "medisch" of "reanimatie", zonder het voorloop-streepje).

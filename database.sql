@@ -202,6 +202,24 @@ CREATE TABLE IF NOT EXISTS melding_status_log (
     FOREIGN KEY (gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Losse taken: een eenvoudig to-do-lijstje per melding, los van elk
+-- protocol. Handig voor iets dat uniek is voor deze ene melding, in
+-- tegenstelling tot protocol-subtaken die bij het protocol zelf horen.
+CREATE TABLE IF NOT EXISTS melding_taken (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    melding_id INT NOT NULL,
+    omschrijving VARCHAR(255) NOT NULL,
+    afgevinkt TINYINT(1) NOT NULL DEFAULT 0,
+    afgevinkt_door_id INT DEFAULT NULL,
+    afgevinkt_op DATETIME DEFAULT NULL,
+    aangemaakt_door_id INT DEFAULT NULL,
+    volgorde INT NOT NULL DEFAULT 0,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
+    FOREIGN KEY (afgevinkt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
+    FOREIGN KEY (aangemaakt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Enkele voorbeeld hoofd- en subclassificaties
 -- (mag je aanpassen/verwijderen via het beheerpaneel)
 INSERT INTO hoofdclassificaties (naam, kleur, beschrijving) VALUES

@@ -323,6 +323,14 @@ gevonden locatie. Exacte namen gaan voor; is er geen exacte match, dan
 wordt een gedeeltelijke match gebruikt. Matcht niets, dan gebeurt er
 stilzwijgend niets (de tekst zelf blijft gewoon staan zoals getypt).
 
+## Losse taken
+
+Naast subtaken die bij een protocol horen, kan een melding ook eigen,
+losse taken hebben — een simpel to-do-lijstje, onafhankelijk van elk
+protocol. Handig voor iets dat alleen voor déze ene melding relevant is.
+Te vinden op de melddetailpagina, in het paneel "Losse taken": toevoegen,
+aanvinken en verwijderen kan direct, zonder ergens anders naartoe te gaan.
+
 ## Toewijzing: Toegewezen aan &amp; Toegewezen centralist
 
 Op de melddetailpagina, onder "Classificatie & status", staan twee
