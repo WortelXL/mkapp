@@ -117,17 +117,24 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <?php foreach ($hoofdclassificaties as $h): ?>
-    <div class="panel">
+    <div class="panel classificatie-panel">
         <div class="row-top" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <h2 style="margin:0; display:flex; align-items:center;">
                 <span class="color-dot" style="background:<?= e($h['kleur']) ?>;"></span><?= e($h['naam']) ?>
             </h2>
-            <form method="post" onsubmit="return confirm('Hoofdclassificatie \'<?= e($h['naam']) ?>\' verwijderen? Alle subclassificaties eronder worden ook verwijderd. Meldingen met deze classificatie verliezen 'm, maar worden niet verwijderd.');">
-                <input type="hidden" name="actie" value="hoofd_verwijderen">
-                <input type="hidden" name="id" value="<?= $h['id'] ?>">
-                <button type="submit" class="btn btn-small btn-danger">Hoofdclassificatie verwijderen</button>
-            </form>
+            <div style="display:flex; gap:12px; align-items:center;">
+                <label for="hoofd-toggle-<?= $h['id'] ?>" class="log-toggle-wrap" title="Details in-/uitklappen">
+                    <span class="log-toggle-switch"></span> Details
+                </label>
+                <form method="post" onsubmit="return confirm('Hoofdclassificatie \'<?= e($h['naam']) ?>\' verwijderen? Alle subclassificaties eronder worden ook verwijderd. Meldingen met deze classificatie verliezen 'm, maar worden niet verwijderd.');">
+                    <input type="hidden" name="actie" value="hoofd_verwijderen">
+                    <input type="hidden" name="id" value="<?= $h['id'] ?>">
+                    <button type="submit" class="btn btn-small btn-danger">Hoofdclassificatie verwijderen</button>
+                </form>
+            </div>
         </div>
+        <input type="checkbox" id="hoofd-toggle-<?= $h['id'] ?>" class="log-toggle-checkbox">
+        <div class="row-log">
         <?php if ($h['beschrijving']): ?>
             <p style="color:var(--muted); margin-top:-8px;"><?= e($h['beschrijving']) ?></p>
         <?php endif; ?>
@@ -190,6 +197,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <button type="submit" class="btn">Toevoegen</button>
         </form>
+        </div>
     </div>
 <?php endforeach; ?>
 

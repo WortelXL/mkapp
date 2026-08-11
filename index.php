@@ -139,80 +139,86 @@ include __DIR__ . '/includes/header.php';
     <a href="/melding_nieuw.php" class="btn btn-primary">+ Nieuwe melding</a>
 </div>
 
-<div class="board">
-    <div class="board-cell <?= $kritiek_open > 0 ? 'pulse' : '' ?>">
-        <div class="num c-red"><?= $kritiek_open ?></div>
-        <div class="lbl">Kritiek &amp; open</div>
+<div class="overzicht-top">
+    <div class="stats-lijst">
+        <div class="stats-lijst-item <?= $kritiek_open > 0 ? 'pulse' : '' ?>">
+            <span class="num c-red"><?= $kritiek_open ?></span>
+            <span class="lbl">Kritiek &amp; open</span>
+        </div>
+        <div class="stats-lijst-item">
+            <span class="num c-red"><?= $open ?></span>
+            <span class="lbl">Open</span>
+        </div>
+        <div class="stats-lijst-item">
+            <span class="num c-amber"><?= $in_behandeling ?></span>
+            <span class="lbl">In behandeling</span>
+        </div>
+        <a href="/archief.php" class="stats-lijst-item stats-lijst-item-link">
+            <span class="num c-green"><?= $afgehandeld ?></span>
+            <span class="lbl">Afgehandeld &rarr; archief</span>
+        </a>
     </div>
-    <div class="board-cell">
-        <div class="num c-red"><?= $open ?></div>
-        <div class="lbl">Open</div>
+
+    <div>
+        <?php if (isset($_GET['via']) && $_GET['via'] === 'commando' && $f_hoofd): ?>
+            <?php
+                $hoofd_naam_geselecteerd = '';
+                foreach ($hoofdclassificaties as $h) {
+                    if ((string) $h['id'] === (string) $f_hoofd) {
+                        $hoofd_naam_geselecteerd = $h['naam'];
+                        break;
+                    }
+                }
+                $sub_naam_geselecteerd = null;
+                if ($f_sub) {
+                    $sub_stmt = $pdo->prepare('SELECT naam FROM subclassificaties WHERE id = :id');
+                    $sub_stmt->execute(['id' => $f_sub]);
+                    $sub_naam_geselecteerd = $sub_stmt->fetchColumn() ?: null;
+                }
+            ?>
+            <div class="alert alert-success">
+                Filter toegepast via commando: <strong><?= e($hoofd_naam_geselecteerd) ?></strong><?= $sub_naam_geselecteerd ? ' · ' . e($sub_naam_geselecteerd) : '' ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($commando_niet_gevonden !== null): ?>
+            <div class="alert alert-error">
+                Geen classificatie gevonden voor "-<?= e($commando_niet_gevonden) ?>" — in plaats daarvan gezocht op tekst.
+            </div>
+        <?php endif; ?>
+
+        <form class="filters filters-verticaal" method="get">
+            <input type="text" name="q" placeholder="Zoek, of typ -classificatienaam..." value="<?= e($f_zoek) ?>">
+            <select name="status">
+                <option value="">Open + in behandeling</option>
+                <?php foreach (['open','in_behandeling'] as $s): ?>
+                    <option value="<?= $s ?>" <?= $f_status === $s ? 'selected' : '' ?>>Alleen <?= lcfirst(status_label($s)) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="prioriteit">
+                <option value="">Alle prioriteiten</option>
+                <?php foreach (['kritiek','hoog','normaal','laag'] as $p): ?>
+                    <option value="<?= $p ?>" <?= $f_prioriteit === $p ? 'selected' : '' ?>><?= prioriteit_label($p) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="hoofd">
+                <option value="">Alle hoofdclassificaties</option>
+                <?php foreach ($hoofdclassificaties as $h): ?>
+                    <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php if ($f_sub): ?>
+                <input type="hidden" name="sub" value="<?= (int) $f_sub ?>">
+            <?php endif; ?>
+            <div class="filters-verticaal-acties">
+                <button type="submit" class="btn btn-small">Filteren</button>
+                <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek): ?>
+                    <a href="/index.php" class="btn btn-small">Wissen</a>
+                <?php endif; ?>
+            </div>
+        </form>
     </div>
-    <div class="board-cell">
-        <div class="num c-amber"><?= $in_behandeling ?></div>
-        <div class="lbl">In behandeling</div>
-    </div>
-    <a href="/archief.php" class="board-cell" style="text-decoration:none; color:inherit; display:block;">
-        <div class="num c-green"><?= $afgehandeld ?></div>
-        <div class="lbl">Afgehandeld &rarr; archief</div>
-    </a>
 </div>
-
-<?php if (isset($_GET['via']) && $_GET['via'] === 'commando' && $f_hoofd): ?>
-    <?php
-        $hoofd_naam_geselecteerd = '';
-        foreach ($hoofdclassificaties as $h) {
-            if ((string) $h['id'] === (string) $f_hoofd) {
-                $hoofd_naam_geselecteerd = $h['naam'];
-                break;
-            }
-        }
-        $sub_naam_geselecteerd = null;
-        if ($f_sub) {
-            $sub_stmt = $pdo->prepare('SELECT naam FROM subclassificaties WHERE id = :id');
-            $sub_stmt->execute(['id' => $f_sub]);
-            $sub_naam_geselecteerd = $sub_stmt->fetchColumn() ?: null;
-        }
-    ?>
-    <div class="alert alert-success">
-        Filter toegepast via commando: <strong><?= e($hoofd_naam_geselecteerd) ?></strong><?= $sub_naam_geselecteerd ? ' · ' . e($sub_naam_geselecteerd) : '' ?>
-    </div>
-<?php endif; ?>
-
-<?php if ($commando_niet_gevonden !== null): ?>
-    <div class="alert alert-error">
-        Geen classificatie gevonden voor "-<?= e($commando_niet_gevonden) ?>" — in plaats daarvan gezocht op tekst.
-    </div>
-<?php endif; ?>
-
-<form class="filters" method="get">
-    <input type="text" name="q" placeholder="Zoek, of typ -classificatienaam..." value="<?= e($f_zoek) ?>">
-    <select name="status">
-        <option value="">Open + in behandeling</option>
-        <?php foreach (['open','in_behandeling'] as $s): ?>
-            <option value="<?= $s ?>" <?= $f_status === $s ? 'selected' : '' ?>>Alleen <?= lcfirst(status_label($s)) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select name="prioriteit">
-        <option value="">Alle prioriteiten</option>
-        <?php foreach (['kritiek','hoog','normaal','laag'] as $p): ?>
-            <option value="<?= $p ?>" <?= $f_prioriteit === $p ? 'selected' : '' ?>><?= prioriteit_label($p) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select name="hoofd">
-        <option value="">Alle hoofdclassificaties</option>
-        <?php foreach ($hoofdclassificaties as $h): ?>
-            <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <?php if ($f_sub): ?>
-        <input type="hidden" name="sub" value="<?= (int) $f_sub ?>">
-    <?php endif; ?>
-    <button type="submit" class="btn btn-small">Filteren</button>
-    <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek): ?>
-        <a href="/index.php" class="btn btn-small">Wissen</a>
-    <?php endif; ?>
-</form>
 
 <div class="melding-list">
     <?php if (!$meldingen): ?>
@@ -312,6 +318,7 @@ include __DIR__ . '/includes/header.php';
     if (ververs_seconden > 0) {
         setInterval(function () {
             if (!zoekveld_actief && document.visibilityState === 'visible') {
+                sessionStorage.setItem('meldkamer_scroll_' + location.pathname, window.scrollY);
                 window.location.reload();
             }
         }, ververs_seconden * 1000);

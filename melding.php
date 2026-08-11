@@ -483,7 +483,7 @@ include __DIR__ . '/includes/header.php';
                         </select>
                         <button type="submit" class="btn">Koppelen</button>
                     </form>
-                <?php elseif (!$alle_protocollen): ?>
+                <?php elseif (!$alle_protocollen && is_beheerder()): ?>
                     <p style="color: var(--muted);">
                         Er zijn nog geen protocollen aangemaakt. Ga naar
                         <a href="/admin/protocollen.php" style="color: var(--amber);">Beheer &rarr; Protocollen</a> om er een toe te voegen.
@@ -699,6 +699,7 @@ vulSubclassificaties2();
     setInterval(function () {
         const heeft_selectie = (window.getSelection() || '').toString().length > 0;
         if (!veld_actief && !heeft_selectie && document.visibilityState === 'visible') {
+            sessionStorage.setItem('meldkamer_scroll_' + location.pathname, window.scrollY);
             window.location.reload();
         }
     }, ververs_seconden * 1000);

@@ -195,6 +195,7 @@ include __DIR__ . '/includes/header.php';
     if (ververs_seconden > 0) {
         setInterval(function () {
             if (document.visibilityState === 'visible') {
+                sessionStorage.setItem('meldkamer_scroll_' + location.pathname, window.scrollY);
                 window.location.reload();
             }
         }, ververs_seconden * 1000);

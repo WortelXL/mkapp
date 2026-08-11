@@ -177,7 +177,10 @@ include __DIR__ . '/../includes/header.php';
         <div class="protocol-card">
             <div class="row-top">
                 <h3><?= e($p['titel']) ?></h3>
-                <div style="display:flex; gap:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <label for="protocol-toggle-<?= $p['id'] ?>" class="log-toggle-wrap" title="Details in-/uitklappen">
+                        <span class="log-toggle-switch"></span> Details
+                    </label>
                     <a href="/admin/protocollen.php?bewerk=<?= $p['id'] ?>" class="btn btn-small">Bewerken</a>
                     <form method="post" onsubmit="return confirm('Protocol \'<?= e($p['titel']) ?>\' verwijderen? Dit ontkoppelt het ook van alle meldingen.');">
                         <input type="hidden" name="actie" value="verwijderen">
@@ -186,6 +189,8 @@ include __DIR__ . '/../includes/header.php';
                     </form>
                 </div>
             </div>
+            <input type="checkbox" id="protocol-toggle-<?= $p['id'] ?>" class="log-toggle-checkbox">
+            <div class="row-log">
             <?php if ($p['sub_naam']): ?>
                 <p class="cat-chip" style="display:inline-block; background: <?= e($p['hoofd_kleur']) ?>22; color: <?= e($p['hoofd_kleur']) ?>; margin: 0 0 8px;">
                     <?= e($p['hoofd_naam']) ?> &middot; <?= e($p['sub_naam']) ?>
@@ -253,6 +258,7 @@ include __DIR__ . '/../includes/header.php';
                 <?php else: ?>
                     <p style="color:var(--muted); font-size:12px;">Maximum van 5 links bereikt — verwijder er eerst een om een nieuwe toe te voegen.</p>
                 <?php endif; ?>
+            </div>
             </div>
         </div>
     <?php endforeach; ?>

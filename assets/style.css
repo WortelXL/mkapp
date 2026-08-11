@@ -264,6 +264,85 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
 .num.c-muted { color: var(--text); }
 
 /* ---- Filters ------------------------------------------------------ */
+/* --- Overzicht: statistieken links, filters rechts ---------------------- */
+.overzicht-top {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 20px;
+}
+
+.stats-lijst {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.stats-lijst-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+.stats-lijst-item:last-child { border-bottom: none; }
+.stats-lijst-item-link {
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s;
+}
+.stats-lijst-item-link:hover { background: var(--panel-2); }
+.stats-lijst-item .num {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1;
+}
+.stats-lijst-item .lbl {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: right;
+}
+.stats-lijst-item.pulse::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 0 0 rgba(239,68,68,0.6);
+    animation: pulse 1.8s infinite;
+}
+.stats-lijst-item.pulse .lbl { padding-right: 16px; }
+
+.filters-verticaal {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+}
+.filters-verticaal select, .filters-verticaal input[type=text] {
+    width: 100%;
+}
+.filters-verticaal-acties {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
 .filters {
     display: flex;
     gap: 10px;
@@ -358,11 +437,15 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
    en stuurt 'm aan via het for/id-koppel. Kleur de switch oranje zodra de
    checkbox aan staat, ongeacht waar in de rij dat zichtbaar gebeurt. */
 .melding-row:has(.log-toggle-checkbox:checked) .log-toggle-switch,
-.panel:has(.log-toggle-checkbox:checked) .log-toggle-switch {
+.protocol-card:has(.log-toggle-checkbox:checked) .log-toggle-switch,
+.classificatie-panel:has(.log-toggle-checkbox:checked) .log-toggle-switch,
+.panel:has(#logboek-toggle:checked) .log-toggle-switch {
     background: var(--amber);
 }
 .melding-row:has(.log-toggle-checkbox:checked) .log-toggle-switch::after,
-.panel:has(.log-toggle-checkbox:checked) .log-toggle-switch::after {
+.protocol-card:has(.log-toggle-checkbox:checked) .log-toggle-switch::after,
+.classificatie-panel:has(.log-toggle-checkbox:checked) .log-toggle-switch::after,
+.panel:has(#logboek-toggle:checked) .log-toggle-switch::after {
     transform: translateX(14px);
 }
 
@@ -810,4 +893,5 @@ table.admin-table tr:last-child td { border-bottom: none; }
     .info-compact { grid-template-columns: repeat(2, 1fr); }
     .melding-row { grid-template-columns: 1fr; align-items: flex-start; }
     .split-columns { grid-template-columns: 1fr; }
+    .overzicht-top { grid-template-columns: 1fr; }
 }
