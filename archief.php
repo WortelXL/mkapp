@@ -36,15 +36,23 @@ if ($f_zoek !== '' && $f_zoek[0] === '-') {
     $f_zoek = $commando;
 }
 
-// Archief = alleen afgeronde meldingen (afgehandeld of geannuleerd),
-// tenzij er specifiek op 1 van de twee gefilterd wordt.
-if ($f_status === 'afgehandeld' || $f_status === 'geannuleerd') {
+$afgeronde_statussen = get_afgeronde_statussen($pdo);
+$afgeronde_sleutels = statussen_sleutels($afgeronde_statussen);
+
+// Archief = alleen afgeronde meldingen (categorie "afgerond"),
+// tenzij er specifiek op 1 status gefilterd wordt.
+if ($f_status !== '' && in_array($f_status, $afgeronde_sleutels, true)) {
     $status_conditie = 'm.status = :status';
     $status_params = ['status' => $f_status];
 } else {
     $f_status = '';
-    $status_conditie = "m.status IN ('afgehandeld', 'geannuleerd')";
+    $status_placeholders = [];
     $status_params = [];
+    foreach ($afgeronde_sleutels as $i => $sleutel) {
+        $status_placeholders[] = ':afgerond' . $i;
+        $status_params['afgerond' . $i] = $sleutel;
+    }
+    $status_conditie = $status_placeholders ? 'm.status IN (' . implode(',', $status_placeholders) . ')' : '1 = 0';
 }
 
 $where  = [$status_conditie];
@@ -108,8 +116,7 @@ if ($meldingen) {
 }
 
 // ---- Tellingen ----------------------------------------------------------
-$totaal_afgehandeld = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'afgehandeld'")->fetchColumn();
-$totaal_geannuleerd = (int) $pdo->query("SELECT COUNT(*) FROM meldingen WHERE status = 'geannuleerd'")->fetchColumn();
+$tellingen = $pdo->query("SELECT status, COUNT(*) AS aantal FROM meldingen GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
 $subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
@@ -129,14 +136,12 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <div class="board">
-    <div class="board-cell">
-        <div class="num c-green"><?= $totaal_afgehandeld ?></div>
-        <div class="lbl">Afgehandeld</div>
-    </div>
-    <div class="board-cell">
-        <div class="num c-muted"><?= $totaal_geannuleerd ?></div>
-        <div class="lbl">Geannuleerd</div>
-    </div>
+    <?php foreach ($afgeronde_statussen as $s): ?>
+        <div class="board-cell">
+            <div class="num" style="color:<?= e($s['kleur']) ?>;"><?= (int) ($tellingen[$s['sleutel']] ?? 0) ?></div>
+            <div class="lbl"><?= e($s['naam']) ?></div>
+        </div>
+    <?php endforeach; ?>
 </div>
 
 <?php if (isset($_GET['via']) && $_GET['via'] === 'commando' && $f_hoofd): ?>
@@ -169,9 +174,10 @@ include __DIR__ . '/includes/header.php';
 <form class="filters" method="get">
     <input type="text" name="q" placeholder="Zoek, of typ -classificatienaam..." value="<?= e($f_zoek) ?>">
     <select name="status">
-        <option value="">Afgehandeld + geannuleerd</option>
-        <option value="afgehandeld" <?= $f_status === 'afgehandeld' ? 'selected' : '' ?>>Alleen afgehandeld</option>
-        <option value="geannuleerd" <?= $f_status === 'geannuleerd' ? 'selected' : '' ?>>Alleen geannuleerd</option>
+        <option value="">Alle afgeronde statussen</option>
+        <?php foreach ($afgeronde_statussen as $s): ?>
+            <option value="<?= e($s['sleutel']) ?>" <?= $f_status === $s['sleutel'] ? 'selected' : '' ?>>Alleen <?= lcfirst(e($s['naam'])) ?></option>
+        <?php endforeach; ?>
     </select>
     <select name="prioriteit">
         <option value="">Alle prioriteiten</option>
@@ -270,9 +276,7 @@ include __DIR__ . '/includes/header.php';
                 <span></span>
             <?php endif; ?>
             <span class="tag <?= prioriteit_class($m['prioriteit']) ?>"><?= prioriteit_label($m['prioriteit']) ?></span>
-            <span class="tag <?= status_class($m['status']) ?>">
-                <span class="tag-dot"></span><?= status_label($m['status']) ?>
-            </span>
+            <?= status_tag_html($m['status']) ?>
         </div>
     <?php endforeach; ?>
 

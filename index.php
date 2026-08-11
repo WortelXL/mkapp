@@ -39,16 +39,27 @@ if ($f_zoek !== '' && $f_zoek[0] === '-') {
     $f_zoek = $commando;
 }
 
+$actieve_statussen = get_actieve_statussen($pdo);
+$actieve_sleutels = statussen_sleutels($actieve_statussen);
+
 // Dashboard toont alleen actieve meldingen (afgehandeld/geannuleerd staan
 // vanaf nu in het archief, zie /archief.php) — status-filter is dus beperkt
-// tot de 2 actieve statussen.
-if ($f_status === 'open' || $f_status === 'in_behandeling') {
+// tot de statussen met categorie "actief".
+if ($f_status !== '' && in_array($f_status, $actieve_sleutels, true)) {
     $where  = ['m.status = :status'];
     $params = ['status' => $f_status];
 } else {
     $f_status = '';
-    $where  = ["m.status IN ('open', 'in_behandeling')"];
+    $where  = [];
     $params = [];
+    $status_placeholders = [];
+    foreach ($actieve_sleutels as $i => $sleutel) {
+        $status_placeholders[] = ':actief_status' . $i;
+        $params['actief_status' . $i] = $sleutel;
+    }
+    $where[] = $status_placeholders
+        ? 'm.status IN (' . implode(',', $status_placeholders) . ')'
+        : '1 = 0';
 }
 
 if ($f_hoofd !== '' && ctype_digit($f_hoofd)) {
@@ -107,21 +118,49 @@ $tellingen = $pdo->query(
     "SELECT status, COUNT(*) AS aantal FROM meldingen GROUP BY status"
 )->fetchAll(PDO::FETCH_KEY_PAIR);
 
-$open           = $tellingen['open'] ?? 0;
-$in_behandeling = $tellingen['in_behandeling'] ?? 0;
-$afgehandeld    = $tellingen['afgehandeld'] ?? 0;
-$kritiek_open   = (int) $pdo->query(
-    "SELECT COUNT(*) FROM meldingen WHERE prioriteit='kritiek' AND status NOT IN ('afgehandeld','geannuleerd')"
-)->fetchColumn();
+$afgeronde_statussen = get_afgeronde_statussen($pdo);
+$totaal_afgerond = 0;
+foreach ($afgeronde_statussen as $s) {
+    $totaal_afgerond += (int) ($tellingen[$s['sleutel']] ?? 0);
+}
+
+$kritiek_placeholders = [];
+$kritiek_params = [];
+foreach ($actieve_sleutels as $i => $sleutel) {
+    $kritiek_placeholders[] = ':ks' . $i;
+    $kritiek_params['ks' . $i] = $sleutel;
+}
+if ($kritiek_placeholders) {
+    $kritiek_stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM meldingen WHERE prioriteit='kritiek' AND status IN (" . implode(',', $kritiek_placeholders) . ')'
+    );
+    $kritiek_stmt->execute($kritiek_params);
+    $kritiek_open = (int) $kritiek_stmt->fetchColumn();
+} else {
+    $kritiek_open = 0;
+}
 
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
+$alle_statussen = get_statussen($pdo);
 
 // Hoogste ID onder de actieve meldingen, ongeacht filters -- gebruikt om
 // clientside te bepalen of er een nieuwe melding is bijgekomen (voor het
 // geluidssignaal), ook als de huidige filter die melding niet toont.
-$globale_hoogste_id = (int) $pdo->query(
-    "SELECT COALESCE(MAX(id), 0) FROM meldingen WHERE status IN ('open', 'in_behandeling')"
-)->fetchColumn();
+if ($actieve_sleutels) {
+    $hoogste_placeholders = [];
+    $hoogste_params = [];
+    foreach ($actieve_sleutels as $i => $sleutel) {
+        $hoogste_placeholders[] = ':hs' . $i;
+        $hoogste_params['hs' . $i] = $sleutel;
+    }
+    $hoogste_stmt = $pdo->prepare(
+        'SELECT COALESCE(MAX(id), 0) FROM meldingen WHERE status IN (' . implode(',', $hoogste_placeholders) . ')'
+    );
+    $hoogste_stmt->execute($hoogste_params);
+    $globale_hoogste_id = (int) $hoogste_stmt->fetchColumn();
+} else {
+    $globale_hoogste_id = 0;
+}
 
 $mijn_instellingen = huidige_gebruiker_instellingen($pdo);
 
@@ -145,17 +184,15 @@ include __DIR__ . '/includes/header.php';
             <span class="num c-red"><?= $kritiek_open ?></span>
             <span class="lbl">Kritiek &amp; open</span>
         </div>
-        <div class="stats-lijst-item">
-            <span class="num c-red"><?= $open ?></span>
-            <span class="lbl">Open</span>
-        </div>
-        <div class="stats-lijst-item">
-            <span class="num c-amber"><?= $in_behandeling ?></span>
-            <span class="lbl">In behandeling</span>
-        </div>
+        <?php foreach ($actieve_statussen as $s): ?>
+            <div class="stats-lijst-item">
+                <span class="num" style="color:<?= e($s['kleur']) ?>;"><?= (int) ($tellingen[$s['sleutel']] ?? 0) ?></span>
+                <span class="lbl"><?= e($s['naam']) ?></span>
+            </div>
+        <?php endforeach; ?>
         <a href="/archief.php" class="stats-lijst-item stats-lijst-item-link">
-            <span class="num c-green"><?= $afgehandeld ?></span>
-            <span class="lbl">Afgehandeld &rarr; archief</span>
+            <span class="num c-green"><?= $totaal_afgerond ?></span>
+            <span class="lbl">Afgerond &rarr; archief</span>
         </a>
     </div>
 
@@ -190,9 +227,9 @@ include __DIR__ . '/includes/header.php';
         <form class="filters filters-verticaal" method="get">
             <input type="text" name="q" placeholder="Zoek, of typ -classificatienaam..." value="<?= e($f_zoek) ?>">
             <select name="status">
-                <option value="">Open + in behandeling</option>
-                <?php foreach (['open','in_behandeling'] as $s): ?>
-                    <option value="<?= $s ?>" <?= $f_status === $s ? 'selected' : '' ?>>Alleen <?= lcfirst(status_label($s)) ?></option>
+                <option value="">Alle actieve statussen</option>
+                <?php foreach ($actieve_statussen as $s): ?>
+                    <option value="<?= e($s['sleutel']) ?>" <?= $f_status === $s['sleutel'] ? 'selected' : '' ?>>Alleen <?= lcfirst(e($s['naam'])) ?></option>
                 <?php endforeach; ?>
             </select>
             <select name="prioriteit">
@@ -254,9 +291,9 @@ include __DIR__ . '/includes/header.php';
             <form method="post" action="/snel_status.php" class="status-form" title="Klik om de status te wijzigen">
                 <input type="hidden" name="melding_id" value="<?= (int) $m['id'] ?>">
                 <input type="hidden" name="terug" value="<?= e($_SERVER['REQUEST_URI']) ?>">
-                <select name="status" class="tag <?= status_class($m['status']) ?>" onchange="this.form.submit()" onclick="event.stopPropagation()">
-                    <?php foreach (['open','in_behandeling','afgehandeld','geannuleerd'] as $s): ?>
-                        <option value="<?= $s ?>" <?= $m['status'] === $s ? 'selected' : '' ?>><?= status_label($s) ?></option>
+                <select name="status" class="tag" style="background:<?= status_kleur($m['status']) ?>22; color:<?= status_kleur($m['status']) ?>;" onchange="this.form.submit()" onclick="event.stopPropagation()">
+                    <?php foreach ($alle_statussen as $s): ?>
+                        <option value="<?= e($s['sleutel']) ?>" <?= $m['status'] === $s['sleutel'] ? 'selected' : '' ?>><?= e($s['naam']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </form>

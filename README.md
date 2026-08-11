@@ -294,6 +294,25 @@ Deze exportfunctie werkt met een eigen, lichte PDF-generator
 (`includes/minipdf.php`) zonder externe library of Composer-afhankelijkheid
 — hoeft dus niet apart geïnstalleerd te worden.
 
+## Statussen
+
+De 4 ingebouwde statussen (open, in behandeling, afgehandeld, geannuleerd)
+kun je via **Beheer &rarr; Statussen** (`/admin/statussen.php`) aanpassen
+qua naam, kleur en categorie, maar niet verwijderen — dat voorkomt dat
+bestaande logica (dashboard/archief) zonder geldige status komt te zitten.
+Daarnaast kun je **eigen statussen** toevoegen, bv. "Wacht op onderdelen"
+of "Doorverwezen". Elke status (ingebouwd of eigen) krijgt een categorie:
+
+- **Actief** — telt mee op het dashboard en de Overview-pagina.
+- **Afgerond** — telt mee in het archief.
+
+Een eigen status verwijderen kan alleen als er geen enkele melding meer
+die status heeft (anders eerst die meldingen naar een andere status
+zetten). Overal waar een status gekozen of getoond wordt — dashboard,
+archief, melddetail, Overview, export, de Stream Deck-API — werkt
+automatisch met de volledige lijst, dus ook met je eigen toegevoegde
+statussen.
+
 ## Labels (later opvolgen)
 
 Beheerders maken labels aan via **Beheer &rarr; Labels**

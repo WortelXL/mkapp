@@ -31,11 +31,20 @@ if ($geselecteerde_ids) {
     $f_label      = $_GET['label'] ?? '';
     $f_zoek       = trim($_GET['q'] ?? '');
 
-    if ($f_status === 'afgehandeld' || $f_status === 'geannuleerd') {
+    $afgeronde_sleutels_export = statussen_sleutels(get_afgeronde_statussen($pdo));
+
+    if ($f_status !== '' && in_array($f_status, $afgeronde_sleutels_export, true)) {
         $where[] = 'm.status = :status';
         $params['status'] = $f_status;
     } else {
-        $where[] = "m.status IN ('afgehandeld', 'geannuleerd')";
+        $status_placeholders_export = [];
+        foreach ($afgeronde_sleutels_export as $i => $sleutel) {
+            $status_placeholders_export[] = ':exp_status' . $i;
+            $params['exp_status' . $i] = $sleutel;
+        }
+        $where[] = $status_placeholders_export
+            ? 'm.status IN (' . implode(',', $status_placeholders_export) . ')'
+            : '1 = 0';
     }
     if ($f_hoofd !== '' && ctype_digit($f_hoofd)) {
         $where[] = 'm.hoofdclassificatie_id = :hoofd';

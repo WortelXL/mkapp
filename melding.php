@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $prioriteit  = $_POST['prioriteit'] ?? $melding['prioriteit'];
         $toegewezen_aan_crew_id = $_POST['toegewezen_aan_crew_id'] !== '' ? (int) $_POST['toegewezen_aan_crew_id'] : null;
         $toegewezen_centralist_id = $_POST['toegewezen_centralist_id'] !== '' ? (int) $_POST['toegewezen_centralist_id'] : null;
-        if (in_array($status, ['open','in_behandeling','afgehandeld','geannuleerd'], true)
+        if (is_geldige_status($pdo, $status)
             && in_array($prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
             $stmt = $pdo->prepare(
                 'UPDATE meldingen SET status = :status, prioriteit = :prioriteit,
@@ -235,6 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $hoofdclassificaties = get_hoofdclassificaties($pdo);
 $gekoppelde_labels = get_labels_voor_melding($pdo, $id);
 $toewijsbare_gebruikers = get_toewijsbare_gebruikers($pdo);
+$alle_statussen = get_statussen($pdo);
 $crew_lijst = get_crew($pdo);
 $gekoppelde_label_ids = array_column($gekoppelde_labels, 'id');
 $alle_labels = get_labels($pdo);
@@ -284,7 +285,7 @@ include __DIR__ . '/includes/header.php';
     </div>
     <div style="display:flex; gap:8px;">
         <span class="tag <?= prioriteit_class($melding['prioriteit']) ?>"><?= prioriteit_label($melding['prioriteit']) ?></span>
-        <span class="tag <?= status_class($melding['status']) ?>"><span class="tag-dot"></span><?= status_label($melding['status']) ?></span>
+        <?= status_tag_html($melding['status']) ?>
     </div>
 </div>
 
@@ -394,8 +395,8 @@ include __DIR__ . '/includes/header.php';
                 <div class="field">
                     <label for="status">Status</label>
                     <select id="status" name="status">
-                        <?php foreach (['open','in_behandeling','afgehandeld','geannuleerd'] as $s): ?>
-                            <option value="<?= $s ?>" <?= $melding['status'] === $s ? 'selected' : '' ?>><?= status_label($s) ?></option>
+                        <?php foreach ($alle_statussen as $s): ?>
+                            <option value="<?= e($s['sleutel']) ?>" <?= $melding['status'] === $s['sleutel'] ? 'selected' : '' ?>><?= e($s['naam']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

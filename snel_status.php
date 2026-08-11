@@ -28,8 +28,7 @@ $melding_id = (int) ($_POST['melding_id'] ?? 0);
 $status     = $_POST['status'] ?? '';
 $terug      = veilig_terug_pad($_POST['terug'] ?? '/index.php');
 
-$geldige_statussen = ['open', 'in_behandeling', 'afgehandeld', 'geannuleerd'];
-if ($melding_id > 0 && in_array($status, $geldige_statussen, true)) {
+if ($melding_id > 0 && is_geldige_status($pdo, $status)) {
     $huidige_stmt = $pdo->prepare('SELECT status FROM meldingen WHERE id = :id');
     $huidige_stmt->execute(['id' => $melding_id]);
     $huidige_status = $huidige_stmt->fetchColumn();

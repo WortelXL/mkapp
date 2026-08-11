@@ -25,7 +25,9 @@
  *                    "classificatie"). Wint van "classificatie" als beide
  *                    zijn meegestuurd. De bijbehorende hoofdclassificatie
  *                    wordt er automatisch bij gezet.
- *   status         (optioneel) - open/in_behandeling/afgehandeld/geannuleerd.
+ *   status         (optioneel) - sleutel van een status (Beheer -> Statussen),
+ *                    standaard "open" (bv. "in_behandeling", of een eigen
+ *                    aangemaakte status).
  *                    Standaard "open".
  *   prioriteit     (optioneel) - laag/normaal/hoog/kritiek. Ontbreekt dit,
  *                    dan wordt de standaardprioriteit van de gevonden
@@ -147,8 +149,7 @@ if (in_array($prioriteit_input, $geldige_prioriteiten, true)) {
     $prioriteit = 'normaal';
 }
 
-$geldige_statussen = ['open', 'in_behandeling', 'afgehandeld', 'geannuleerd'];
-if (in_array($status_input, $geldige_statussen, true)) {
+if (is_geldige_status($pdo, $status_input)) {
     $status = $status_input;
 } else {
     $status = 'open';

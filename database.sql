@@ -13,6 +13,30 @@ CREATE TABLE IF NOT EXISTS instellingen (
     bijgewerkt_op DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Statussen van een melding. De 4 ingebouwde (open/in_behandeling/
+-- afgehandeld/geannuleerd) zijn niet verwijderbaar (anders raken bestaande
+-- meldingen/logica zonder geldige status), maar wel aan te passen (naam,
+-- kleur, categorie). Eigen, extra statussen kunnen gewoon toegevoegd en
+-- verwijderd worden. "categorie" bepaalt of een status meetelt als actief
+-- (zichtbaar op dashboard/Overview) of afgerond (zichtbaar in archief).
+CREATE TABLE IF NOT EXISTS statussen (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sleutel VARCHAR(50) NOT NULL UNIQUE,
+    naam VARCHAR(100) NOT NULL,
+    kleur VARCHAR(7) NOT NULL DEFAULT '#6b7280',
+    categorie ENUM('actief','afgerond') NOT NULL DEFAULT 'actief',
+    ingebouwd TINYINT(1) NOT NULL DEFAULT 0,
+    volgorde INT NOT NULL DEFAULT 0,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO statussen (sleutel, naam, kleur, categorie, ingebouwd, volgorde) VALUES
+    ('open', 'Open', '#ef4444', 'actief', 1, 1),
+    ('in_behandeling', 'In behandeling', '#f5a524', 'actief', 1, 2),
+    ('afgehandeld', 'Afgehandeld', '#22c55e', 'afgerond', 1, 3),
+    ('geannuleerd', 'Geannuleerd', '#6b7280', 'afgerond', 1, 4)
+ON DUPLICATE KEY UPDATE sleutel = sleutel;
+
 CREATE TABLE IF NOT EXISTS gebruikers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gebruikersnaam VARCHAR(50) NOT NULL UNIQUE,
@@ -127,7 +151,7 @@ CREATE TABLE IF NOT EXISTS meldingen (
     subclassificatie_id INT DEFAULT NULL,
     locatie VARCHAR(150) DEFAULT NULL,
     prioriteit ENUM('laag','normaal','hoog','kritiek') NOT NULL DEFAULT 'normaal',
-    status ENUM('open','in_behandeling','afgehandeld','geannuleerd') NOT NULL DEFAULT 'open',
+    status VARCHAR(50) NOT NULL DEFAULT 'open',
     gemeld_door VARCHAR(100) DEFAULT NULL,
     toegewezen_aan VARCHAR(100) DEFAULT NULL,
     toegewezen_aan_gebruiker_id INT DEFAULT NULL,
@@ -195,7 +219,7 @@ CREATE TABLE IF NOT EXISTS melding_subtaak_status (
 CREATE TABLE IF NOT EXISTS melding_status_log (
     id INT AUTO_INCREMENT PRIMARY KEY,
     melding_id INT NOT NULL,
-    status ENUM('open','in_behandeling','afgehandeld','geannuleerd') NOT NULL,
+    status VARCHAR(50) NOT NULL,
     gebruiker_id INT DEFAULT NULL,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,

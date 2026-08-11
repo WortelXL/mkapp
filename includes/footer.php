@@ -23,6 +23,25 @@
 document.addEventListener('submit', function () {
     sessionStorage.setItem('meldkamer_scroll_' + location.pathname, window.scrollY);
 }, true);
+
+// Onthoudt de open/dicht-stand van elk schakelaartje (protocol-/
+// classificatiedetails, logboek, etc.) per pagina, zodat een blokje open
+// blijft staan nadat je er iets in toevoegt/wijzigt (de pagina herlaadt
+// dan) -- totdat je 'm zelf weer dichtklikt.
+(function () {
+    document.querySelectorAll('.log-toggle-checkbox[id]').forEach(function (checkbox) {
+        const sleutel = 'meldkamer_toggle_' + location.pathname + '_' + checkbox.id;
+        const opgeslagen = localStorage.getItem(sleutel);
+        if (opgeslagen === '1') {
+            checkbox.checked = true;
+        } else if (opgeslagen === '0') {
+            checkbox.checked = false;
+        }
+        checkbox.addEventListener('change', function () {
+            localStorage.setItem(sleutel, checkbox.checked ? '1' : '0');
+        });
+    });
+})();
 </script>
 </body>
 </html>

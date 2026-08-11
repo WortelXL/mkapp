@@ -8,6 +8,7 @@ $aantal_protocollen = (int) $pdo->query('SELECT COUNT(*) FROM protocollen')->fet
 $aantal_meldingen    = (int) $pdo->query('SELECT COUNT(*) FROM meldingen')->fetchColumn();
 $aantal_gebruikers   = (int) $pdo->query('SELECT COUNT(*) FROM gebruikers')->fetchColumn();
 $aantal_crew         = (int) $pdo->query('SELECT COUNT(*) FROM crew')->fetchColumn();
+$aantal_statussen    = (int) $pdo->query('SELECT COUNT(*) FROM statussen')->fetchColumn();
 
 $actief = 'admin';
 $paginatitel = 'Beheer';
@@ -31,6 +32,12 @@ $onderdelen = [
         'omschrijving' => 'Hoofd- en subclassificaties waarmee meldingen ingedeeld worden.',
         'link' => '/admin/classificaties.php',
         'aantal' => $aantal_hoofdclassificaties,
+    ],
+    [
+        'titel' => 'Statussen',
+        'omschrijving' => 'Ingebouwde statussen aanpassen (naam/kleur/categorie), of eigen statussen toevoegen/verwijderen.',
+        'link' => '/admin/statussen.php',
+        'aantal' => $aantal_statussen,
     ],
     [
         'titel' => 'Protocollen',

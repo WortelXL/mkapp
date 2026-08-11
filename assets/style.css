@@ -263,6 +263,27 @@ nav.mainnav a.active { color: var(--bg); background: var(--amber); }
 .num.c-green { color: var(--green); }
 .num.c-muted { color: var(--text); }
 
+/* --- Compacte variant (Overview-pagina): 5 kolommen per rij, kleiner ---- */
+.board-compact {
+    grid-template-columns: repeat(5, 1fr);
+}
+.board-compact .board-cell {
+    padding: 10px 12px;
+}
+.board-compact .board-cell .num {
+    font-size: 20px;
+}
+.board-compact .board-cell .lbl {
+    margin-top: 3px;
+    font-size: 10.5px;
+}
+.board-compact .board-cell.pulse::before {
+    top: 10px;
+    right: 10px;
+    width: 6px;
+    height: 6px;
+}
+
 /* ---- Filters ------------------------------------------------------ */
 /* --- Overzicht: statistieken links, filters rechts ---------------------- */
 .overzicht-top {

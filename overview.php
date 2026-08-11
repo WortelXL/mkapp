@@ -3,10 +3,21 @@ require_once __DIR__ . '/includes/functions.php';
 vereis_login();
 $pdo = get_pdo();
 
-// Alleen actieve meldingen (open + in behandeling), net als het dashboard.
+$actieve_statussen = get_actieve_statussen($pdo);
+$actieve_sleutels = statussen_sleutels($actieve_statussen);
+
+// Alleen actieve meldingen (net als het dashboard).
 // Geen filters/zoekbalk hier bewust: dit is een passief overzichtsscherm,
 // geen werkscherm -- en er wordt vanuit hier niet doorgeklikt naar een
 // melding. Wel is het logboek per melding direct in te klappen.
+$plekhouders_status = [];
+$params_status = [];
+foreach ($actieve_sleutels as $i => $sleutel) {
+    $plekhouders_status[] = ':as' . $i;
+    $params_status['as' . $i] = $sleutel;
+}
+$status_conditie = $plekhouders_status ? 'm.status IN (' . implode(',', $plekhouders_status) . ')' : '1 = 0';
+
 $sql = "SELECT m.*,
                h.naam AS hoofd_naam, h.kleur AS hoofd_kleur,
                s.naam AS sub_naam,
@@ -15,9 +26,11 @@ $sql = "SELECT m.*,
         LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
         LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
         LEFT JOIN gebruikers g ON g.id = m.aangemaakt_door_id
-        WHERE m.status IN ('open', 'in_behandeling')
+        WHERE $status_conditie
         ORDER BY FIELD(m.prioriteit,'kritiek','hoog','normaal','laag'), m.aangemaakt_op DESC";
-$meldingen = $pdo->query($sql)->fetchAll();
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params_status);
+$meldingen = $stmt->fetchAll();
 
 // Labels + logboek (omschrijving + notities) per melding in 1 keer ophalen
 $labels_per_melding = [];
@@ -51,12 +64,26 @@ $tellingen = $pdo->query(
     "SELECT status, COUNT(*) AS aantal FROM meldingen GROUP BY status"
 )->fetchAll(PDO::FETCH_KEY_PAIR);
 
-$open           = $tellingen['open'] ?? 0;
-$in_behandeling = $tellingen['in_behandeling'] ?? 0;
-$afgehandeld    = $tellingen['afgehandeld'] ?? 0;
-$kritiek_open   = (int) $pdo->query(
-    "SELECT COUNT(*) FROM meldingen WHERE prioriteit='kritiek' AND status NOT IN ('afgehandeld','geannuleerd')"
-)->fetchColumn();
+$afgeronde_statussen = get_afgeronde_statussen($pdo);
+$totaal_afgerond = 0;
+foreach ($afgeronde_statussen as $s) {
+    $totaal_afgerond += (int) ($tellingen[$s['sleutel']] ?? 0);
+}
+
+if ($params_status) {
+    $kritiek_stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM meldingen m WHERE prioriteit='kritiek' AND $status_conditie"
+    );
+    $kritiek_stmt->execute($params_status);
+    $kritiek_open = (int) $kritiek_stmt->fetchColumn();
+
+    $hoogste_stmt = $pdo->prepare("SELECT COALESCE(MAX(id), 0) FROM meldingen m WHERE $status_conditie");
+    $hoogste_stmt->execute($params_status);
+    $globale_hoogste_id = (int) $hoogste_stmt->fetchColumn();
+} else {
+    $kritiek_open = 0;
+    $globale_hoogste_id = 0;
+}
 
 $mijn_instellingen = huidige_gebruiker_instellingen($pdo);
 
@@ -73,22 +100,20 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<div class="board">
+<div class="board board-compact">
     <div class="board-cell <?= $kritiek_open > 0 ? 'pulse' : '' ?>">
         <div class="num c-red"><?= $kritiek_open ?></div>
         <div class="lbl">Kritiek &amp; open</div>
     </div>
-    <div class="board-cell">
-        <div class="num c-red"><?= $open ?></div>
-        <div class="lbl">Open</div>
-    </div>
-    <div class="board-cell">
-        <div class="num c-amber"><?= $in_behandeling ?></div>
-        <div class="lbl">In behandeling</div>
-    </div>
+    <?php foreach ($actieve_statussen as $s): ?>
+        <div class="board-cell">
+            <div class="num" style="color:<?= e($s['kleur']) ?>;"><?= (int) ($tellingen[$s['sleutel']] ?? 0) ?></div>
+            <div class="lbl"><?= e($s['naam']) ?></div>
+        </div>
+    <?php endforeach; ?>
     <a href="/archief.php" class="board-cell" style="text-decoration:none; color:inherit; display:block;">
-        <div class="num c-green"><?= $afgehandeld ?></div>
-        <div class="lbl">Afgehandeld &rarr; archief</div>
+        <div class="num c-green"><?= $totaal_afgerond ?></div>
+        <div class="lbl">Afgerond &rarr; archief</div>
     </a>
 </div>
 
@@ -130,9 +155,7 @@ include __DIR__ . '/includes/header.php';
                 <span></span>
             <?php endif; ?>
             <span class="tag <?= prioriteit_class($m['prioriteit']) ?>"><?= prioriteit_label($m['prioriteit']) ?></span>
-            <span class="tag <?= status_class($m['status']) ?>">
-                <span class="tag-dot"></span><?= status_label($m['status']) ?>
-            </span>
+            <?= status_tag_html($m['status']) ?>
 
             <input type="checkbox" id="<?= $toggle_id ?>" class="log-toggle-checkbox">
             <div class="row-log">
@@ -164,7 +187,7 @@ include __DIR__ . '/includes/header.php';
 (function () {
     const ververs_seconden = <?= (int) $mijn_instellingen['auto_refresh_seconden'] ?>;
     const geluid_aan = <?= $mijn_instellingen['geluid_nieuwe_melding'] ? 'true' : 'false' ?>;
-    const globale_hoogste_id = <?= (int) $pdo->query("SELECT COALESCE(MAX(id), 0) FROM meldingen WHERE status IN ('open', 'in_behandeling')")->fetchColumn() ?>;
+    const globale_hoogste_id = <?= $globale_hoogste_id ?>;
     const OPSLAG_SLEUTEL = 'meldkamer_laatste_gezien_id';
 
     function speel_meldingsgeluid() {

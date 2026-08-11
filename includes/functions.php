@@ -328,25 +328,71 @@ function vind_classificatie_commando(PDO $pdo, string $zoekterm): ?array
     return null;
 }
 
-/** Labels en kleurklassen voor status */
-function status_label(string $status): string
+/**
+ * Haalt alle statussen op (ingebouwd + eigen), in de ingestelde volgorde.
+ * Gecachet binnen 1 requestcyclus, dus meerdere aanroepen kosten geen
+ * extra databasequery's.
+ */
+function get_statussen(PDO $pdo): array
 {
-    return [
-        'open'           => 'Open',
-        'in_behandeling' => 'In behandeling',
-        'afgehandeld'    => 'Afgehandeld',
-        'geannuleerd'    => 'Geannuleerd',
-    ][$status] ?? $status;
+    static $cache = null;
+    if ($cache === null) {
+        $cache = $pdo->query('SELECT * FROM statussen ORDER BY volgorde ASC, id ASC')->fetchAll();
+    }
+    return $cache;
 }
 
-function status_class(string $status): string
+/** Alleen de statussen die meetellen als "actief" (dashboard/Overview) */
+function get_actieve_statussen(PDO $pdo): array
 {
-    return [
-        'open'           => 'status-open',
-        'in_behandeling' => 'status-in_behandeling',
-        'afgehandeld'    => 'status-afgehandeld',
-        'geannuleerd'    => 'status-geannuleerd',
-    ][$status] ?? '';
+    return array_values(array_filter(get_statussen($pdo), fn($s) => $s['categorie'] === 'actief'));
+}
+
+/** Alleen de statussen die meetellen als "afgerond" (archief) */
+function get_afgeronde_statussen(PDO $pdo): array
+{
+    return array_values(array_filter(get_statussen($pdo), fn($s) => $s['categorie'] === 'afgerond'));
+}
+
+/** Sleutels (bv. ['open','in_behandeling']) van een lijst statusrijen, voor gebruik in SQL IN(...) */
+function statussen_sleutels(array $statussen): array
+{
+    return array_column($statussen, 'sleutel');
+}
+
+/** Of een sleutel een geldige, bestaande status is */
+function is_geldige_status(PDO $pdo, string $status): bool
+{
+    return in_array($status, statussen_sleutels(get_statussen($pdo)), true);
+}
+
+/** Weergavenaam van een status, bv. "In behandeling" */
+function status_label(string $status): string
+{
+    static $cache = null;
+    if ($cache === null) {
+        $cache = get_pdo()->query('SELECT sleutel, naam FROM statussen')->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
+    return $cache[$status] ?? $status;
+}
+
+/** Hex-kleur van een status, voor het kleuren van het statuslabel */
+function status_kleur(string $status): string
+{
+    static $cache = null;
+    if ($cache === null) {
+        $cache = get_pdo()->query('SELECT sleutel, kleur FROM statussen')->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
+    return $cache[$status] ?? '#6b7280';
+}
+
+/** Kant-en-klaar statuslabel (kleur komt uit de database, dus ook voor eigen statussen) */
+function status_tag_html(string $status): string
+{
+    $kleur = status_kleur($status);
+    return '<span class="tag" style="background:' . $kleur . '22; color:' . $kleur . ';">'
+        . '<span class="tag-dot" style="background:' . $kleur . ';"></span>'
+        . e(status_label($status)) . '</span>';
 }
 
 /** Logt een status in de geschiedenis van een melding (bij aanmaken of wijzigen) */
