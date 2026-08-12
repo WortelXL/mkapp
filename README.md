@@ -270,15 +270,18 @@ Beide formaten bevatten dezelfde basisgegevens: meld-ID, titel, hoofd-/
 subclassificatie, prioriteit, status, locatie, gemeld door, ingevoerd
 door, laatst bijgewerkt door, tijdstippen en labels. Daarnaast bevatten
 beide ook de **omschrijving**, het **volledige logboek** (elke notitie
-met tijdstip en auteur) en de **gekoppelde protocollen** (titel + volledige
-inhoud) per melding:
+met tijdstip en auteur), de **gekoppelde protocollen** (titel + volledige
+inhoud), de **subtaken** van die protocollen en de **losse taken** per
+melding — allemaal met afvinkstatus, en bij een afgevinkte taak ook
+tijdstip en wie 'm afvinkte:
 
-- De **CSV** heeft hiervoor 3 extra kolommen (Omschrijving, Logboek,
-  Protocollen) — logboekregels staan onder elkaar binnen de cel.
+- De **CSV** heeft hiervoor 5 extra kolommen (Omschrijving, Logboek,
+  Protocollen, Subtaken, Losse taken) — regels staan onder elkaar binnen
+  de cel, elke taak begint met `[x]` (afgevinkt) of `[ ]` (nog niet).
 - De **PDF** is geen platte tabel meer, maar een leesbaar rapport met een
   apart blok per melding (kenmerken, statusverloop, omschrijving, logboek,
-  protocollen), met automatische regelterugloop en paginawissels waar
-  nodig.
+  protocollen met hun subtaken, losse taken), met automatische
+  regelterugloop en paginawissels waar nodig.
 
 **Statusverloop & doorlooptijden.** Elke keer dat de status van een
 melding wijzigt (via de melddetailpagina, de snelle statuswijziging op

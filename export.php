@@ -93,6 +93,8 @@ $meldingen = $stmt->fetchAll();
 $labels_per_melding = [];
 $notities_per_melding = [];
 $protocollen_per_melding = [];
+$subtaken_per_melding = [];
+$losse_taken_per_melding = [];
 if ($meldingen) {
     $ids = array_column($meldingen, 'id');
     $plekhouders = implode(',', array_fill(0, count($ids), '?'));
@@ -117,13 +119,42 @@ if ($meldingen) {
     }
 
     $protocollen_stmt = $pdo->prepare(
-        "SELECT mp.melding_id, p.titel, p.inhoud FROM melding_protocollen mp
+        "SELECT mp.melding_id, p.id AS protocol_id, p.titel, p.inhoud FROM melding_protocollen mp
          JOIN protocollen p ON p.id = mp.protocol_id
          WHERE mp.melding_id IN ($plekhouders) ORDER BY p.titel ASC"
     );
     $protocollen_stmt->execute($ids);
     foreach ($protocollen_stmt->fetchAll() as $rij) {
         $protocollen_per_melding[$rij['melding_id']][] = $rij;
+    }
+
+    // Subtaken (van gekoppelde protocollen) met afvinkstatus per melding
+    $subtaken_stmt = $pdo->prepare(
+        "SELECT mp.melding_id, ps.protocol_id, ps.omschrijving, ps.volgorde,
+                mss.afgevinkt, mss.afgevinkt_op, g.naam AS afgevinkt_door_naam
+         FROM melding_protocollen mp
+         JOIN protocol_subtaken ps ON ps.protocol_id = mp.protocol_id
+         LEFT JOIN melding_subtaak_status mss ON mss.subtaak_id = ps.id AND mss.melding_id = mp.melding_id
+         LEFT JOIN gebruikers g ON g.id = mss.afgevinkt_door_id
+         WHERE mp.melding_id IN ($plekhouders)
+         ORDER BY ps.volgorde ASC, ps.id ASC"
+    );
+    $subtaken_stmt->execute($ids);
+    foreach ($subtaken_stmt->fetchAll() as $rij) {
+        $subtaken_per_melding[$rij['melding_id']][$rij['protocol_id']][] = $rij;
+    }
+
+    // Losse taken (los van protocollen) per melding
+    $losse_taken_stmt = $pdo->prepare(
+        "SELECT lt.*, g.naam AS afgevinkt_door_naam
+         FROM melding_taken lt
+         LEFT JOIN gebruikers g ON g.id = lt.afgevinkt_door_id
+         WHERE lt.melding_id IN ($plekhouders)
+         ORDER BY lt.volgorde ASC, lt.id ASC"
+    );
+    $losse_taken_stmt->execute($ids);
+    foreach ($losse_taken_stmt->fetchAll() as $rij) {
+        $losse_taken_per_melding[$rij['melding_id']][] = $rij;
     }
 }
 
@@ -149,7 +180,7 @@ if ($formaat === 'csv') {
         'Meld-ID', 'Titel', 'Hoofdclassificatie', 'Subclassificatie', 'Prioriteit', 'Status',
         'Locatie', 'Gemeld door', 'Ingevoerd door', 'Laatst bijgewerkt door',
         'Aangemaakt', 'Laatst bijgewerkt', 'Labels', 'Omschrijving', 'Logboek', 'Protocollen',
-        'Doorlooptijd per status', 'Totale doorlooptijd',
+        'Subtaken', 'Losse taken', 'Doorlooptijd per status', 'Totale doorlooptijd',
     ], ';');
 
     foreach ($meldingen as $m) {
@@ -170,6 +201,39 @@ if ($formaat === 'csv') {
                 $regels[] = $p['titel'] . ': ' . $p['inhoud'];
             }
             $protocollen_tekst = implode("\n\n", $regels);
+        }
+
+        $subtaken_tekst = '';
+        if (!empty($protocollen_per_melding[$m['id']])) {
+            $regels = [];
+            foreach ($protocollen_per_melding[$m['id']] as $p) {
+                $subtaken_van_protocol = $subtaken_per_melding[$m['id']][$p['protocol_id']] ?? [];
+                foreach ($subtaken_van_protocol as $t) {
+                    $vinkje = $t['afgevinkt'] ? '[x]' : '[ ]';
+                    $regel = $vinkje . ' ' . $p['titel'] . ' - ' . $t['omschrijving'];
+                    if ($t['afgevinkt']) {
+                        $regel .= ' (afgevinkt door ' . ($t['afgevinkt_door_naam'] ?: 'onbekend')
+                            . ' op ' . (new DateTime($t['afgevinkt_op']))->format('d-m-Y H:i') . ')';
+                    }
+                    $regels[] = $regel;
+                }
+            }
+            $subtaken_tekst = implode("\n", $regels);
+        }
+
+        $losse_taken_tekst = '';
+        if (!empty($losse_taken_per_melding[$m['id']])) {
+            $regels = [];
+            foreach ($losse_taken_per_melding[$m['id']] as $t) {
+                $vinkje = $t['afgevinkt'] ? '[x]' : '[ ]';
+                $regel = $vinkje . ' ' . $t['omschrijving'];
+                if ($t['afgevinkt']) {
+                    $regel .= ' (afgevinkt door ' . ($t['afgevinkt_door_naam'] ?: 'onbekend')
+                        . ' op ' . (new DateTime($t['afgevinkt_op']))->format('d-m-Y H:i') . ')';
+                }
+                $regels[] = $regel;
+            }
+            $losse_taken_tekst = implode("\n", $regels);
         }
 
         $tijdvakken = $status_tijdvakken_per_melding[$m['id']] ?? [];
@@ -203,6 +267,8 @@ if ($formaat === 'csv') {
             $m['omschrijving'] ?: '',
             $logboek_tekst,
             $protocollen_tekst,
+            $subtaken_tekst,
+            $losse_taken_tekst,
             $doorlooptijd_tekst,
             $totale_seconden > 0 ? format_duur($totale_seconden) : '',
         ], ';');
@@ -302,6 +368,36 @@ foreach ($meldingen as $m) {
             $pdf->tekstOp($marge, $p['titel'], true);
             $pdf->nieuweRegel();
             $pdf->paragraaf($marge + 12, $p['inhoud'], $volleBreedte - 12);
+
+            $subtaken_van_protocol = $subtaken_per_melding[$m['id']][$p['protocol_id']] ?? [];
+            if ($subtaken_van_protocol) {
+                foreach ($subtaken_van_protocol as $t) {
+                    $pdf->ruimteNodig(14);
+                    $vinkje = $t['afgevinkt'] ? '[x]' : '[ ]';
+                    $regel = $vinkje . ' ' . $t['omschrijving'];
+                    if ($t['afgevinkt']) {
+                        $regel .= ' - afgevinkt door ' . ($t['afgevinkt_door_naam'] ?: 'onbekend')
+                            . ' op ' . (new DateTime($t['afgevinkt_op']))->format('d-m-Y H:i');
+                    }
+                    $pdf->paragraaf($marge + 12, $regel, $volleBreedte - 12);
+                }
+            }
+        }
+    }
+
+    if (!empty($losse_taken_per_melding[$m['id']])) {
+        $pdf->nieuweRegel();
+        $pdf->tekstOp($marge, 'Losse taken:', true);
+        $pdf->nieuweRegel();
+        foreach ($losse_taken_per_melding[$m['id']] as $t) {
+            $pdf->ruimteNodig(14);
+            $vinkje = $t['afgevinkt'] ? '[x]' : '[ ]';
+            $regel = $vinkje . ' ' . $t['omschrijving'];
+            if ($t['afgevinkt']) {
+                $regel .= ' - afgevinkt door ' . ($t['afgevinkt_door_naam'] ?: 'onbekend')
+                    . ' op ' . (new DateTime($t['afgevinkt_op']))->format('d-m-Y H:i');
+            }
+            $pdf->paragraaf($marge, $regel, $volleBreedte);
         }
     }
 
