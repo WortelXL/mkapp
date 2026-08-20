@@ -32,6 +32,9 @@ define('EVENT_NAAM', env_of('EVENT_NAAM', 'Evenement 2026'));
 define('EVENT_START_DATUM', env_of('EVENT_START_DATUM', '2026-08-14'));
 define('EVENT_AANTAL_DAGEN', (int) env_of('EVENT_AANTAL_DAGEN', 3));
 
+// ---- Versie -------------------------------------------------------------
+define('APP_VERSION', 'V1.3.6');
+
 // ---- Overig ------------------------------------------------------------
 date_default_timezone_set(env_of('APP_TIMEZONE', 'Europe/Amsterdam'));
 

@@ -31,13 +31,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($actie === 'archief_legen') {
-        $stmt = $pdo->prepare("DELETE FROM meldingen WHERE status IN ('afgehandeld', 'geannuleerd')");
-        $stmt->execute();
-        $aantal_verwijderd = $stmt->rowCount();
+        $afgeronde_sleutels = statussen_sleutels(get_afgeronde_statussen($pdo));
+        if ($afgeronde_sleutels) {
+            $plekhouders = implode(',', array_fill(0, count($afgeronde_sleutels), '?'));
+            $stmt = $pdo->prepare("DELETE FROM meldingen WHERE status IN ($plekhouders)");
+            $stmt->execute($afgeronde_sleutels);
+            $aantal_verwijderd = $stmt->rowCount();
+        } else {
+            $aantal_verwijderd = 0;
+        }
         $succes = $aantal_verwijderd > 0
             ? $aantal_verwijderd . ' melding(en) uit het archief verwijderd.'
             : 'Het archief was al leeg, er was niets te verwijderen.';
     }
+
+    if ($actie === 'versie_opslaan') {
+        $id            = (int) ($_POST['id'] ?? 0);
+        $versienummer  = trim($_POST['versienummer'] ?? '');
+        $datum         = trim($_POST['datum'] ?? '');
+        $wijzigingen   = trim($_POST['wijzigingen'] ?? '');
+
+        if ($versienummer === '' || $datum === '' || $wijzigingen === '') {
+            $fout = 'Vul een versienummer, datum en de wijzigingen in.';
+        } elseif ($id > 0) {
+            $stmt = $pdo->prepare('UPDATE versies SET versienummer = :v, datum = :d, wijzigingen = :w WHERE id = :id');
+            $stmt->execute(['v' => $versienummer, 'd' => $datum, 'w' => $wijzigingen, 'id' => $id]);
+            $succes = 'Versie bijgewerkt.';
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO versies (versienummer, datum, wijzigingen) VALUES (:v, :d, :w)');
+            $stmt->execute(['v' => $versienummer, 'd' => $datum, 'w' => $wijzigingen]);
+            $succes = 'Versie "' . $versienummer . '" toegevoegd.';
+        }
+    }
+
+    if ($actie === 'versie_verwijderen') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $stmt = $pdo->prepare('DELETE FROM versies WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $succes = 'Versie verwijderd.';
+    }
+}
+
+$versie_bewerk = null;
+if (isset($_GET['versie_bewerk'])) {
+    $stmt = $pdo->prepare('SELECT * FROM versies WHERE id = :id');
+    $stmt->execute(['id' => (int) $_GET['versie_bewerk']]);
+    $versie_bewerk = $stmt->fetch() ?: null;
 }
 
 $huidige_naam   = $_POST['event_naam'] ?? event_naam($pdo);
@@ -95,21 +134,82 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <?php
-$aantal_in_archief = (int) $pdo->query(
-    "SELECT COUNT(*) FROM meldingen WHERE status IN ('afgehandeld', 'geannuleerd')"
-)->fetchColumn();
+$afgeronde_sleutels_tonen = statussen_sleutels(get_afgeronde_statussen($pdo));
+$aantal_in_archief = 0;
+if ($afgeronde_sleutels_tonen) {
+    $plekhouders_tonen = implode(',', array_fill(0, count($afgeronde_sleutels_tonen), '?'));
+    $telling_stmt = $pdo->prepare("SELECT COUNT(*) FROM meldingen WHERE status IN ($plekhouders_tonen)");
+    $telling_stmt->execute($afgeronde_sleutels_tonen);
+    $aantal_in_archief = (int) $telling_stmt->fetchColumn();
+}
 ?>
 <div class="panel">
     <h2>Archief beheren</h2>
     <p style="color:var(--muted); margin-top:-8px;">
         Er <?= $aantal_in_archief === 1 ? 'staat' : 'staan' ?> op dit moment
         <strong style="color:var(--text);"><?= $aantal_in_archief ?></strong>
-        afgehandelde/geannuleerde melding<?= $aantal_in_archief === 1 ? '' : 'en' ?> in het archief.
+        afgeronde melding<?= $aantal_in_archief === 1 ? '' : 'en' ?> in het archief.
     </p>
-    <form method="post" onsubmit="return confirm('Weet je zeker dat je het hele archief wilt legen?\n\nDit verwijdert alle <?= $aantal_in_archief ?> afgehandelde/geannuleerde melding(en) — inclusief hun logboek, protocollen, subtaken en labels — permanent uit de database.\n\nDit kan niet ongedaan worden gemaakt.');">
+    <form method="post" onsubmit="return confirm('Weet je zeker dat je het hele archief wilt legen?\n\nDit verwijdert alle <?= $aantal_in_archief ?> afgeronde melding(en) — inclusief hun logboek, protocollen, subtaken en labels — permanent uit de database.\n\nDit kan niet ongedaan worden gemaakt.');">
         <input type="hidden" name="actie" value="archief_legen">
         <button type="submit" class="btn btn-danger" <?= $aantal_in_archief === 0 ? 'disabled' : '' ?>>Archief leegmaken</button>
     </form>
+</div>
+
+<div class="panel">
+    <h2>Versiebeheer</h2>
+    <p style="color:var(--muted); margin-top:-8px;">Wijzigingenlog dat via het knopje in de footer te bekijken is. Nieuwste versie staat bovenaan.</p>
+    <form method="post" class="form-grid">
+        <input type="hidden" name="actie" value="versie_opslaan">
+        <input type="hidden" name="id" value="<?= $versie_bewerk['id'] ?? 0 ?>">
+        <div class="field">
+            <label for="versienummer">Versienummer</label>
+            <input type="text" id="versienummer" name="versienummer" required value="<?= e($versie_bewerk['versienummer'] ?? '') ?>" placeholder="bv. V1.3.6">
+        </div>
+        <div class="field">
+            <label for="datum">Datum</label>
+            <input type="text" id="datum" name="datum" required value="<?= e($versie_bewerk['datum'] ?? '') ?>" placeholder="bv. 13 augustus 2026">
+        </div>
+        <div class="field full">
+            <label for="wijzigingen">Wijzigingen</label>
+            <textarea id="wijzigingen" name="wijzigingen" required style="min-height:160px; font-family:var(--font-mono); font-size:13px;" placeholder="## Groepsnaam
+- Wijziging 1
+- Wijziging 2
+
+## Andere groep
+- Nog een wijziging"><?= e($versie_bewerk['wijzigingen'] ?? '') ?></textarea>
+            <p style="color:var(--muted); font-size:12px; margin:6px 0 0;">Een regel die begint met <code>## </code> wordt een groepskop, elke andere regel wordt een los punt (een <code>- </code> ervoor mag, maar hoeft niet).</p>
+        </div>
+        <div class="actions full">
+            <button type="submit" class="btn btn-primary"><?= $versie_bewerk ? 'Wijzigingen opslaan' : 'Versie toevoegen' ?></button>
+            <?php if ($versie_bewerk): ?>
+                <a href="/admin/instellingen.php" class="btn">Annuleren</a>
+            <?php endif; ?>
+        </div>
+    </form>
+
+    <?php $versies_lijst = get_versies($pdo); ?>
+    <?php if ($versies_lijst): ?>
+        <table class="admin-table" style="margin-top:18px;">
+            <thead><tr><th>Versie</th><th>Datum</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($versies_lijst as $v): ?>
+                <tr>
+                    <td style="font-family:var(--font-mono); color:var(--amber);"><?= e($v['versienummer']) ?></td>
+                    <td style="color:var(--muted);"><?= e($v['datum']) ?></td>
+                    <td style="white-space:nowrap;">
+                        <a href="/admin/instellingen.php?versie_bewerk=<?= $v['id'] ?>#versienummer" class="btn btn-small">Bewerken</a>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Versie \'<?= e($v['versienummer']) ?>\' verwijderen uit het wijzigingenlog?');">
+                            <input type="hidden" name="actie" value="versie_verwijderen">
+                            <input type="hidden" name="id" value="<?= $v['id'] ?>">
+                            <button type="submit" class="btn btn-small btn-danger">Verwijderen</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

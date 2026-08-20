@@ -24,6 +24,7 @@ services:
     container_name: meldkamer_db
     restart: unless-stopped
     environment:
+      TZ: "Europe/Amsterdam"
       MARIADB_ROOT_PASSWORD: wijzig_dit_root_wachtwoord
       MARIADB_DATABASE: meldkamer
       MARIADB_USER: meldkamer_user

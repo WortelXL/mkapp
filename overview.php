@@ -6,17 +6,36 @@ $pdo = get_pdo();
 $actieve_statussen = get_actieve_statussen($pdo);
 $actieve_sleutels = statussen_sleutels($actieve_statussen);
 
-// Alleen actieve meldingen (net als het dashboard).
-// Geen filters/zoekbalk hier bewust: dit is een passief overzichtsscherm,
-// geen werkscherm -- en er wordt vanuit hier niet doorgeklikt naar een
-// melding. Wel is het logboek per melding direct in te klappen.
+// ---- Filters (prioriteit, hoofdclassificatie, sortering) ----------------
+$f_hoofd      = $_GET['hoofd'] ?? '';
+$f_prioriteit = $_GET['prioriteit'] ?? '';
+$f_sort       = $_GET['sort'] ?? 'prioriteit';
+if (!in_array($f_sort, ['prioriteit', 'nieuwste'], true)) {
+    $f_sort = 'prioriteit';
+}
+
+// Alleen actieve meldingen (net als het dashboard). Wel filters op
+// prioriteit/classificatie en sortering — geen zoekbalk of statusfilter,
+// dit blijft bewust een simpel, passief overzichtsscherm. Er wordt
+// vanuit hier ook niet doorgeklikt naar een melding zelf. Wel is het
+// logboek per melding direct in te klappen.
 $plekhouders_status = [];
 $params_status = [];
 foreach ($actieve_sleutels as $i => $sleutel) {
     $plekhouders_status[] = ':as' . $i;
     $params_status['as' . $i] = $sleutel;
 }
-$status_conditie = $plekhouders_status ? 'm.status IN (' . implode(',', $plekhouders_status) . ')' : '1 = 0';
+$where = [$plekhouders_status ? 'm.status IN (' . implode(',', $plekhouders_status) . ')' : '1 = 0'];
+$params = $params_status;
+
+if ($f_hoofd !== '' && ctype_digit($f_hoofd)) {
+    $where[] = 'm.hoofdclassificatie_id = :hoofd';
+    $params['hoofd'] = (int) $f_hoofd;
+}
+if ($f_prioriteit !== '' && in_array($f_prioriteit, ['laag','normaal','hoog','kritiek'], true)) {
+    $where[] = 'm.prioriteit = :prioriteit';
+    $params['prioriteit'] = $f_prioriteit;
+}
 
 $sql = "SELECT m.*,
                h.naam AS hoofd_naam, h.kleur AS hoofd_kleur,
@@ -26,10 +45,12 @@ $sql = "SELECT m.*,
         LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
         LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
         LEFT JOIN gebruikers g ON g.id = m.aangemaakt_door_id
-        WHERE $status_conditie
-        ORDER BY FIELD(m.prioriteit,'kritiek','hoog','normaal','laag'), m.aangemaakt_op DESC";
+        WHERE " . implode(' AND ', $where);
+$sql .= $f_sort === 'nieuwste'
+    ? ' ORDER BY m.aangemaakt_op DESC'
+    : ' ORDER BY FIELD(m.prioriteit,"kritiek","hoog","normaal","laag"), m.aangemaakt_op DESC';
 $stmt = $pdo->prepare($sql);
-$stmt->execute($params_status);
+$stmt->execute($params);
 $meldingen = $stmt->fetchAll();
 
 // Labels + logboek (omschrijving + notities) per melding in 1 keer ophalen
@@ -70,6 +91,8 @@ foreach ($afgeronde_statussen as $s) {
     $totaal_afgerond += (int) ($tellingen[$s['sleutel']] ?? 0);
 }
 
+$status_conditie = $plekhouders_status ? 'm.status IN (' . implode(',', $plekhouders_status) . ')' : '1 = 0';
+
 if ($params_status) {
     $kritiek_stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM meldingen m WHERE prioriteit='kritiek' AND $status_conditie"
@@ -85,6 +108,7 @@ if ($params_status) {
     $globale_hoogste_id = 0;
 }
 
+$hoofdclassificaties = get_hoofdclassificaties($pdo);
 $mijn_instellingen = huidige_gebruiker_instellingen($pdo);
 
 $actief = 'overview';
@@ -116,6 +140,29 @@ include __DIR__ . '/includes/header.php';
         <div class="lbl">Afgerond &rarr; archief</div>
     </a>
 </div>
+
+<form class="filters" method="get">
+    <select name="prioriteit">
+        <option value="">Alle prioriteiten</option>
+        <?php foreach (['kritiek','hoog','normaal','laag'] as $p): ?>
+            <option value="<?= $p ?>" <?= $f_prioriteit === $p ? 'selected' : '' ?>><?= prioriteit_label($p) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select name="hoofd">
+        <option value="">Alle hoofdclassificaties</option>
+        <?php foreach ($hoofdclassificaties as $h): ?>
+            <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select name="sort">
+        <option value="prioriteit" <?= $f_sort === 'prioriteit' ? 'selected' : '' ?>>Sorteer op prioriteit</option>
+        <option value="nieuwste" <?= $f_sort === 'nieuwste' ? 'selected' : '' ?>>Nieuwste bovenaan</option>
+    </select>
+    <button type="submit" class="btn btn-small">Filteren</button>
+    <?php if ($f_hoofd || $f_prioriteit || $f_sort !== 'prioriteit'): ?>
+        <a href="/overview.php" class="btn btn-small">Wissen</a>
+    <?php endif; ?>
+</form>
 
 <div class="melding-list">
     <?php if (!$meldingen): ?>

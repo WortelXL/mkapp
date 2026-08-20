@@ -35,6 +35,54 @@ function set_instelling(PDO $pdo, string $sleutel, string $waarde): void
     $stmt->execute(['s' => $sleutel, 'w' => $waarde]);
 }
 
+/** Alle versies uit het wijzigingenlog, nieuwste eerst */
+function get_versies(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM versies ORDER BY id DESC')->fetchAll();
+}
+
+/** Het versienummer dat als "huidige versie" getoond wordt (nieuwste rij, of terugval op APP_VERSION) */
+function huidige_versie(PDO $pdo): string
+{
+    $nieuwste = $pdo->query('SELECT versienummer FROM versies ORDER BY id DESC LIMIT 1')->fetchColumn();
+    return $nieuwste ?: (defined('APP_VERSION') ? APP_VERSION : '');
+}
+
+/**
+ * Zet de vrije wijzigingen-tekst van een versie om naar HTML. Een regel
+ * die begint met "## " wordt een groepskop, een regel die begint met "- "
+ * (of gewoon een losse regel) wordt een bullet-item.
+ */
+function render_wijzigingen_html(string $tekst): string
+{
+    $html = '';
+    $binnen_lijst = false;
+    foreach (explode("\n", $tekst) as $regel) {
+        $regel = trim($regel);
+        if ($regel === '') {
+            continue;
+        }
+        if (str_starts_with($regel, '## ')) {
+            if ($binnen_lijst) {
+                $html .= '</ul>';
+                $binnen_lijst = false;
+            }
+            $html .= '<p class="wijzigingen-groep">' . e(trim(substr($regel, 3))) . '</p>';
+        } else {
+            if (!$binnen_lijst) {
+                $html .= '<ul>';
+                $binnen_lijst = true;
+            }
+            $regel = str_starts_with($regel, '- ') ? trim(substr($regel, 2)) : $regel;
+            $html .= '<li>' . e($regel) . '</li>';
+        }
+    }
+    if ($binnen_lijst) {
+        $html .= '</ul>';
+    }
+    return $html;
+}
+
 function event_naam(PDO $pdo): string
 {
     return get_instelling($pdo, 'event_naam', EVENT_NAAM);

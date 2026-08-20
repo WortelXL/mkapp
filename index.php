@@ -9,6 +9,10 @@ $f_hoofd      = $_GET['hoofd'] ?? '';
 $f_sub        = $_GET['sub'] ?? '';
 $f_prioriteit = $_GET['prioriteit'] ?? '';
 $f_zoek       = trim($_GET['q'] ?? '');
+$f_sort       = $_GET['sort'] ?? 'prioriteit';
+if (!in_array($f_sort, ['prioriteit', 'nieuwste'], true)) {
+    $f_sort = 'prioriteit';
+}
 
 // ---- Commando in de zoekbalk: "-medisch" of "-reanimatie" -----------
 // Vervangt de zoekterm door een echt hoofd-/subclassificatiefilter en
@@ -90,7 +94,9 @@ $sql = "SELECT m.*,
 if ($where) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sql .= ' ORDER BY FIELD(m.prioriteit,"kritiek","hoog","normaal","laag"), m.aangemaakt_op DESC';
+$sql .= $f_sort === 'nieuwste'
+    ? ' ORDER BY m.aangemaakt_op DESC'
+    : ' ORDER BY FIELD(m.prioriteit,"kritiek","hoog","normaal","laag"), m.aangemaakt_op DESC';
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
@@ -244,12 +250,16 @@ include __DIR__ . '/includes/header.php';
                     <option value="<?= $h['id'] ?>" <?= $f_hoofd == $h['id'] ? 'selected' : '' ?>><?= e($h['naam']) ?></option>
                 <?php endforeach; ?>
             </select>
+            <select name="sort">
+                <option value="prioriteit" <?= $f_sort === 'prioriteit' ? 'selected' : '' ?>>Sorteer op prioriteit</option>
+                <option value="nieuwste" <?= $f_sort === 'nieuwste' ? 'selected' : '' ?>>Nieuwste bovenaan</option>
+            </select>
             <?php if ($f_sub): ?>
                 <input type="hidden" name="sub" value="<?= (int) $f_sub ?>">
             <?php endif; ?>
             <div class="filters-verticaal-acties">
                 <button type="submit" class="btn btn-small">Filteren</button>
-                <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek): ?>
+                <?php if ($f_status || $f_hoofd || $f_sub || $f_prioriteit || $f_zoek || $f_sort !== 'prioriteit'): ?>
                     <a href="/index.php" class="btn btn-small">Wissen</a>
                 <?php endif; ?>
             </div>

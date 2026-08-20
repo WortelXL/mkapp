@@ -379,6 +379,17 @@ Elke gebruiker (die wél inlogt) kan ook een **functie** hebben (bv.
 het aanmaken van een nieuwe gebruiker als achteraf, inline per rij. De
 functie wordt getoond naast de naam in de "Toegewezen centralist"-dropdown.
 
+## Versiebeheer
+
+Onderaan elke pagina staat een knopje met het huidige versienummer, dat
+een pop-up opent met het volledige wijzigingenlog ("Wat is er nieuw").
+Beheerbaar via **Beheer &rarr; Instellingen**, onderaan bij "Versiebeheer":
+een nieuwe versie toevoegen (versienummer, datum, wijzigingen), bestaande
+versies bewerken of verwijderen. Het wijzigingenveld is vrije tekst: een
+regel die begint met `## ` wordt een groepskop, elke andere regel wordt
+een los punt. Het getoonde versienummer in de footer is altijd de
+nieuwste (bovenste) versie in deze lijst.
+
 ## Persoonlijke instellingen
 
 Elke gebruiker heeft een eigen instellingenpagina, bereikbaar door op de

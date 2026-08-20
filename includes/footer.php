@@ -1,4 +1,26 @@
-    <p class="footer-note">Meldkamer systeem — <?= e(event_naam($pdo)) ?></p>
+<?php $versies = get_versies($pdo); ?>
+    <p class="footer-note">
+        Meldkamer systeem — <?= e(event_naam($pdo)) ?>
+        <button type="button" class="versie-knop" onclick="document.getElementById('wijzigingen-dialog').showModal()"><?= e(huidige_versie($pdo)) ?></button>
+    </p>
+
+    <dialog id="wijzigingen-dialog" class="wijzigingen-dialog">
+        <div class="wijzigingen-kop">
+            <h2>Wat is er nieuw</h2>
+            <button type="button" class="wijzigingen-sluiten" onclick="document.getElementById('wijzigingen-dialog').close()" aria-label="Sluiten">&times;</button>
+        </div>
+        <div class="wijzigingen-inhoud">
+            <?php if (!$versies): ?>
+                <p style="color:var(--muted);">Nog geen wijzigingenlog beschikbaar.</p>
+            <?php endif; ?>
+            <?php foreach ($versies as $release): ?>
+                <div class="wijzigingen-release">
+                    <p class="wijzigingen-release-kop"><?= e($release['versienummer']) ?> <span>&middot; <?= e($release['datum']) ?></span></p>
+                    <?= render_wijzigingen_html($release['wijzigingen']) ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </dialog>
 </div>
 <script>
 // Zet de scrollpositie terug na het herladen van deze pagina (na een
