@@ -81,6 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             if ($status !== $melding['status']) {
                 log_status($pdo, $id, $status, $_SESSION['gebruiker_id']);
+                verstuur_webhooks($pdo, 'status_gewijzigd', [
+                    'id' => $id,
+                    'meld_id' => $melding['meld_id'],
+                    'titel' => $melding['titel'],
+                    'oude_status' => $melding['status'],
+                    'nieuwe_status' => $status,
+                ]);
             }
         }
         header('Location: /melding.php?id=' . $id . '&bijgewerkt=1');
@@ -98,6 +105,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             't' => $nieuw ? date('Y-m-d H:i:s') : null,
             'id' => $id,
         ]);
+        if ($nieuw) {
+            verstuur_webhooks($pdo, 'attentie', [
+                'id' => $id,
+                'meld_id' => $melding['meld_id'],
+                'titel' => $melding['titel'],
+                'status' => $melding['status'],
+            ]);
+        }
         header('Location: /melding.php?id=' . $id);
         exit;
     }
@@ -194,6 +209,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($actie === 'melding_koppelen') {
+        $koppel_aan_id = (int) ($_POST['koppel_aan_id'] ?? 0);
+        $type = $_POST['type'] ?? 'gerelateerd';
+        if (!array_key_exists($type, koppeling_types())) {
+            $type = 'gerelateerd';
+        }
+        if ($koppel_aan_id > 0 && $koppel_aan_id !== $id) {
+            $bestaat_stmt = $pdo->prepare('SELECT 1 FROM meldingen WHERE id = :id');
+            $bestaat_stmt->execute(['id' => $koppel_aan_id]);
+            if ($bestaat_stmt->fetchColumn()) {
+                $stmt = $pdo->prepare(
+                    'INSERT IGNORE INTO melding_koppelingen (melding_id, gekoppelde_melding_id, type, aangemaakt_door_id)
+                     VALUES (:m, :g, :t, :u)'
+                );
+                $stmt->execute(['m' => $id, 'g' => $koppel_aan_id, 't' => $type, 'u' => $_SESSION['gebruiker_id']]);
+            }
+        }
+        header('Location: /melding.php?id=' . $id . '#koppelingen');
+        exit;
+    }
+
+    if ($actie === 'melding_ontkoppelen') {
+        $koppeling_id = (int) ($_POST['koppeling_id'] ?? 0);
+        $stmt = $pdo->prepare(
+            'DELETE FROM melding_koppelingen WHERE id = :kid AND (melding_id = :m OR gekoppelde_melding_id = :m)'
+        );
+        $stmt->execute(['kid' => $koppeling_id, 'm' => $id]);
+        header('Location: /melding.php?id=' . $id . '#koppelingen');
+        exit;
+    }
+
     if ($actie === 'notitie_toevoegen') {
         $notitie = trim($_POST['notitie'] ?? '');
         if ($notitie !== '') {
@@ -254,6 +300,18 @@ $alle_statussen = get_statussen($pdo);
 $crew_lijst = get_crew($pdo);
 $gekoppelde_label_ids = array_column($gekoppelde_labels, 'id');
 $alle_labels = get_labels($pdo);
+
+// Gekoppelde meldingen + kandidaten om (nog) aan te koppelen (alle
+// andere meldingen, niet degene die al gekoppeld zijn en niet zichzelf)
+$gekoppelde_meldingen = get_gekoppelde_meldingen($pdo, $id);
+$reeds_gekoppelde_ids = array_column($gekoppelde_meldingen, 'melding_id');
+$uitsluiten_ids = array_merge([$id], $reeds_gekoppelde_ids);
+$plekhouders_uitsluiten = implode(',', array_fill(0, count($uitsluiten_ids), '?'));
+$kandidaten_stmt = $pdo->prepare(
+    "SELECT id, meld_id, titel, status FROM meldingen WHERE id NOT IN ($plekhouders_uitsluiten) ORDER BY aangemaakt_op DESC LIMIT 200"
+);
+$kandidaten_stmt->execute($uitsluiten_ids);
+$koppel_kandidaten = $kandidaten_stmt->fetchAll();
 $beschikbare_labels = array_filter($alle_labels, fn($l) => !in_array($l['id'], $gekoppelde_label_ids, true));
 $subs_per_hoofd = get_subclassificaties_gegroepeerd($pdo);
 
@@ -604,6 +662,58 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
+</div>
+
+<div class="panel" id="koppelingen">
+    <h2>Gekoppelde meldingen</h2>
+    <p style="color:var(--muted); font-size:12.5px; margin-top:-8px;">Blijven zelfstandige meldingen (eigen status/protocol/logboek) — dit is puur een zichtbare relatie, bv. een EHBO-inzet waarbij een AMBU wordt opgeroepen.</p>
+
+    <?php if (!$gekoppelde_meldingen): ?>
+        <p style="color: var(--muted); margin:0 0 14px;">Nog geen gekoppelde meldingen.</p>
+    <?php endif; ?>
+    <?php foreach ($gekoppelde_meldingen as $gk): ?>
+        <div class="losse-taak-regel">
+            <a href="/melding.php?id=<?= (int) $gk['melding_id'] ?>" style="flex:1; display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--text); font-size:13.5px;">
+                <span class="cat-chip" style="background: var(--amber-dim); color: var(--amber);"><?= e($gk['label']) ?></span>
+                <span style="font-family:var(--font-mono); color:var(--muted);"><?= e($gk['meld_id']) ?></span>
+                <?= e($gk['titel']) ?>
+                <?= status_tag_html($gk['status']) ?>
+            </a>
+            <form method="post" style="margin:0;" onsubmit="return confirm('Koppeling verwijderen? De meldingen zelf blijven gewoon bestaan.');">
+                <input type="hidden" name="actie" value="melding_ontkoppelen">
+                <input type="hidden" name="koppeling_id" value="<?= $gk['koppeling_id'] ?>">
+                <button type="submit" class="btn btn-small btn-danger" title="Loskoppelen">&times;</button>
+            </form>
+        </div>
+    <?php endforeach; ?>
+
+    <form method="post" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center;">
+        <input type="hidden" name="actie" value="melding_koppelen">
+        <span style="font-size:13px; color:var(--muted);">Deze melding is</span>
+        <select name="type" style="width:auto;">
+            <?php foreach (koppeling_types() as $sleutel => $t): ?>
+                <option value="<?= e($sleutel) ?>"><?= $sleutel === 'vervolg' ? 'vervolg van' : 'gerelateerd aan' ?></option>
+            <?php endforeach; ?>
+        </select>
+        <div class="combo-search" data-combo="koppel_aan" style="flex:1; min-width:220px;">
+            <input type="text" id="koppel_aan_zoek" class="combo-input" autocomplete="off" placeholder="Zoek melding op meld-ID of titel...">
+            <input type="hidden" name="koppel_aan_id" class="combo-value" value="">
+            <div class="combo-opties" hidden>
+                <?php foreach ($koppel_kandidaten as $k): ?>
+                    <div class="combo-optie" data-id="<?= $k['id'] ?>" data-naam="<?= e($k['meld_id']) ?> — <?= e($k['titel']) ?>" data-zoek="<?= e(mb_strtolower($k['meld_id'] . ' ' . $k['titel'])) ?>">
+                        <span><?= e($k['meld_id']) ?> — <?= e($k['titel']) ?></span>
+                        <span class="combo-functie"><?= e(status_label($k['status'])) ?></span>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (!$koppel_kandidaten): ?>
+                    <div class="combo-geen-resultaat">Geen andere meldingen gevonden.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-small">Koppelen</button>
+    </form>
+
+    <a href="/melding_nieuw.php?koppel_aan=<?= $id ?>&locatie=<?= urlencode($melding['locatie'] ?? '') ?>" class="btn btn-small" style="margin-top:10px; display:inline-block; text-decoration:none;">+ Vervolgmelding aanmaken</a>
 </div>
 
 <script>

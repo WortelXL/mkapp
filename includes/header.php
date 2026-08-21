@@ -30,6 +30,7 @@ $paginatitel = $paginatitel ?? event_naam($pdo);
                     <a href="/overview.php" class="<?= $actief === 'overview' ? 'active' : '' ?>">Overview</a>
                 <?php else: ?>
                     <a href="/index.php" class="<?= $actief === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
+                    <a href="/samengevoegd.php" class="<?= $actief === 'samengevoegd' ? 'active' : '' ?>">Samengevoegd</a>
                     <a href="/melding_nieuw.php" class="<?= $actief === 'nieuw' ? 'active' : '' ?>">Nieuwe melding</a>
                     <a href="/archief.php" class="<?= $actief === 'archief' ? 'active' : '' ?>">Archief</a>
                     <a href="/overview.php" class="<?= $actief === 'overview' ? 'active' : '' ?>">Overview</a>

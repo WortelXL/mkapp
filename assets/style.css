@@ -539,6 +539,62 @@ select.tag option { background: var(--panel-2); color: var(--text); }
     border-radius: 100px;
 }
 
+/* --- Samengevoegd-pagina: koppeling tussen 2 meldingen ------------------- */
+.koppeling-rij {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto;
+    align-items: center;
+    gap: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+}
+.koppeling-melding {
+    text-decoration: none;
+    color: var(--text);
+    padding: 4px 0;
+}
+.koppeling-melding .melding-id {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 3px;
+}
+.koppeling-melding .titel {
+    font-weight: 600;
+    font-size: 14px;
+}
+.koppeling-melding:hover .titel { color: var(--amber); }
+.koppeling-midden {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--muted);
+    text-align: center;
+}
+.koppeling-type {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.koppeling-pijl { font-size: 16px; color: var(--amber); }
+.koppeling-acties {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+.koppeling-meta {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.5;
+}
+
 .empty {
     text-align: center;
     padding: 60px 20px;
@@ -1004,4 +1060,8 @@ table.admin-table tr:last-child td { border-bottom: none; }
     .melding-row { grid-template-columns: 1fr; align-items: flex-start; }
     .split-columns { grid-template-columns: 1fr; }
     .overzicht-top { grid-template-columns: 1fr; }
+    .koppeling-rij { grid-template-columns: 1fr; }
+    .koppeling-midden { flex-direction: row; }
+    .koppeling-pijl { transform: rotate(90deg); }
+    .koppeling-acties { align-items: flex-start; }
 }

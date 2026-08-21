@@ -5,6 +5,20 @@ $pdo = get_pdo();
 
 $fout = '';
 
+// Vanuit "+ Vervolgmelding aanmaken" op een andere melding: die melding-id
+// staat in de querystring en wordt als hidden veld meegestuurd, zodat de
+// koppeling na het aanmaken automatisch gelegd wordt.
+$koppel_aan_id = (int) ($_POST['koppel_aan_id'] ?? $_GET['koppel_aan'] ?? 0);
+$koppel_aan_melding = null;
+if ($koppel_aan_id > 0) {
+    $koppel_stmt = $pdo->prepare('SELECT id, meld_id, titel FROM meldingen WHERE id = :id');
+    $koppel_stmt->execute(['id' => $koppel_aan_id]);
+    $koppel_aan_melding = $koppel_stmt->fetch() ?: null;
+    if (!$koppel_aan_melding) {
+        $koppel_aan_id = 0;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $omschrijving          = trim($_POST['omschrijving'] ?? '');
     $hoofdclassificatie_id = $_POST['hoofdclassificatie_id'] !== '' ? (int) $_POST['hoofdclassificatie_id'] : null;
@@ -48,6 +62,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nieuwe_melding_id = (int) $pdo->lastInsertId();
         log_status($pdo, $nieuwe_melding_id, 'open', $_SESSION['gebruiker_id']);
         koppel_protocollen_automatisch($pdo, $nieuwe_melding_id, $subclassificatie_id);
+        if ($koppel_aan_id > 0) {
+            $koppel_stmt = $pdo->prepare(
+                'INSERT IGNORE INTO melding_koppelingen (melding_id, gekoppelde_melding_id, type, aangemaakt_door_id)
+                 VALUES (:m, :g, :t, :u)'
+            );
+            $koppel_stmt->execute([
+                'm' => $nieuwe_melding_id,
+                'g' => $koppel_aan_id,
+                't' => 'vervolg',
+                'u' => $_SESSION['gebruiker_id'],
+            ]);
+        }
+        verstuur_webhooks($pdo, 'melding_aangemaakt', [
+            'id' => $nieuwe_melding_id,
+            'meld_id' => $meld_id,
+            'titel' => $titel,
+            'prioriteit' => $prioriteit,
+            'status' => 'open',
+            'locatie' => $locatie ?: null,
+        ]);
         header('Location: /melding.php?id=' . $nieuwe_melding_id . '&aangemaakt=1');
         exit;
     }
@@ -71,12 +105,21 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php if ($koppel_aan_melding): ?>
+    <div class="alert alert-success">
+        Deze melding wordt automatisch gekoppeld als vervolg van <strong><?= e($koppel_aan_melding['meld_id']) ?> — <?= e($koppel_aan_melding['titel']) ?></strong>.
+    </div>
+<?php endif; ?>
+
 <?php if ($fout): ?>
     <div class="alert alert-error"><?= e($fout) ?></div>
 <?php endif; ?>
 
 <div class="panel">
     <form method="post">
+        <?php if ($koppel_aan_id): ?>
+            <input type="hidden" name="koppel_aan_id" value="<?= $koppel_aan_id ?>">
+        <?php endif; ?>
         <div class="form-grid">
             <div class="field full">
                 <label>Titel (automatisch, op basis van classificatie)</label>
@@ -91,7 +134,7 @@ include __DIR__ . '/includes/header.php';
 
             <div class="field">
                 <label for="locatie">Locatie</label>
-                <input type="text" id="locatie" name="locatie" value="<?= e($_POST['locatie'] ?? '') ?>" placeholder="bv. Podium 2, ingang Noord">
+                <input type="text" id="locatie" name="locatie" value="<?= e($_POST['locatie'] ?? $_GET['locatie'] ?? '') ?>" placeholder="bv. Podium 2, ingang Noord">
             </div>
 
             <div class="field">

@@ -345,6 +345,28 @@ gevonden locatie. Exacte namen gaan voor; is er geen exacte match, dan
 wordt een gedeeltelijke match gebruikt. Matcht niets, dan gebeurt er
 stilzwijgend niets (de tekst zelf blijft gewoon staan zoals getypt).
 
+## Connectiviteit (uitgaande webhooks)
+
+Beheer &rarr; Connectiviteit (`/admin/connectiviteit.php`) stuurt
+automatisch een bericht (HTTP POST met JSON-body) naar een externe URL
+zodra iets gebeurt — handig om bv. een Slack-/Teams-kanaal, een eigen
+dashboard, of een ander systeem live op de hoogte te houden. Per webhook
+kies je:
+
+- **Naam en URL** van de ontvanger.
+- **Op welke gebeurtenissen** hij afgaat: nieuwe melding aangemaakt,
+  status gewijzigd, en/of een attentiesignaal gegeven.
+- **Actief/uitgeschakeld**, zonder de webhook te hoeven verwijderen.
+
+Een **testknop** per webhook stuurt meteen een testbericht en toont
+direct of het gelukt is; het overzicht laat ook de status en eventuele
+foutmelding van de laatste échte verzending zien.
+
+De verzending gebeurt synchroon, op het moment zelf, met een timeout van
+5 seconden — een trage of onbereikbare ontvanger kan de bijbehorende
+actie (bv. het aanmaken van een melding) dus even vertragen, maar een
+mislukte verzending breekt nooit de actie zelf.
+
 ## Backup & Restore
 
 Beheer &rarr; Backup & Restore (`/admin/backup.php`) exporteert de
@@ -362,6 +384,28 @@ je kunt dezelfde backup gerust meerdere keren importeren zonder
 duplicaten. Protocollen en crew worden altijd als nieuw toegevoegd (die
 hebben geen unieke naam om op te herkennen), dus daar kan herhaald
 importeren wel dubbele invoer opleveren.
+
+## Gekoppelde meldingen
+
+Meldingen kunnen aan elkaar gekoppeld worden — bv. een EHBO-inzet die een
+AMBU-inzet oplevert. Ze blijven allebei zelfstandige meldingen (eigen
+status, protocol, logboek, doorlooptijden); koppelen is puur een
+zichtbare relatie, geen samenvoeging. Een melding kan aan meerdere
+andere meldingen tegelijk gekoppeld zijn (bv. één hoofdincident met een
+aantal gerelateerde meldingen).
+
+Op de melddetailpagina, in het paneel **"Gekoppelde meldingen"**:
+
+- **Koppelen aan een bestaande melding** — kies een type ("is vervolg
+  van" of "is gerelateerd aan") en zoek de andere melding op meld-ID of
+  titel. Op de andere melding verschijnt automatisch het passende
+  omgekeerde label (bv. "Vervolg van" wordt daar "Vervolgmelding").
+- **"+ Vervolgmelding aanmaken"** — sneltoets die het aanmaakformulier
+  opent met de locatie al ingevuld, en de nieuwe melding meteen koppelt
+  aan degene waar je vandaan kwam.
+
+Op dashboard, Overview en archief verschijnt een 🔗-icoon voor het
+meld-ID zodra een melding ergens aan gekoppeld is.
 
 ## Attentiesignaal
 

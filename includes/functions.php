@@ -330,6 +330,53 @@ function get_losse_taken(PDO $pdo, int $melding_id): array
 }
 
 /**
+ * Beschikbare koppelingstypes tussen meldingen. "label" is het label
+ * zoals getoond op de melding die de koppeling aangemaakt heeft (bv.
+ * "Vervolg van: MK-D2-011"), "omgekeerd" is het label zoals getoond op
+ * de andere kant van diezelfde koppeling (bv. "Vervolgmelding: MK-D2-014").
+ */
+function koppeling_types(): array
+{
+    return [
+        'vervolg'     => ['label' => 'Vervolg van', 'omgekeerd' => 'Vervolgmelding'],
+        'gerelateerd' => ['label' => 'Gerelateerd aan', 'omgekeerd' => 'Gerelateerd aan'],
+    ];
+}
+
+/** Alle meldingen die aan 1 melding gekoppeld zijn, in beide richtingen */
+function get_gekoppelde_meldingen(PDO $pdo, int $melding_id): array
+{
+    $types = koppeling_types();
+    $resultaat = [];
+
+    $stmt = $pdo->prepare(
+        'SELECT k.id AS koppeling_id, k.type, m.id AS melding_id, m.meld_id, m.titel, m.status
+         FROM melding_koppelingen k
+         JOIN meldingen m ON m.id = k.gekoppelde_melding_id
+         WHERE k.melding_id = :m'
+    );
+    $stmt->execute(['m' => $melding_id]);
+    foreach ($stmt->fetchAll() as $rij) {
+        $rij['label'] = $types[$rij['type']]['label'] ?? $rij['type'];
+        $resultaat[] = $rij;
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT k.id AS koppeling_id, k.type, m.id AS melding_id, m.meld_id, m.titel, m.status
+         FROM melding_koppelingen k
+         JOIN meldingen m ON m.id = k.melding_id
+         WHERE k.gekoppelde_melding_id = :m'
+    );
+    $stmt->execute(['m' => $melding_id]);
+    foreach ($stmt->fetchAll() as $rij) {
+        $rij['label'] = $types[$rij['type']]['omgekeerd'] ?? $rij['type'];
+        $resultaat[] = $rij;
+    }
+
+    return $resultaat;
+}
+
+/**
  * Zoekt een hoofd-/subclassificatie op basis van een commando-tekst
  * (bv. "medisch" of "reanimatie", zonder het voorloop-streepje).
  * Exacte naam-matches gaan voor gedeeltelijke matches; subclassificaties
@@ -662,6 +709,97 @@ function bereken_melding_titel(PDO $pdo, ?int $hoofd_id, ?int $sub_id): string
 }
 
 /** Crewleden (contactpersonen zonder login), voor de "Toegewezen aan"-dropdown */
+/** Beschikbare gebeurtenissen waar een webhook op kan reageren */
+function beschikbare_webhook_events(): array
+{
+    return [
+        'melding_aangemaakt' => 'Nieuwe melding aangemaakt',
+        'status_gewijzigd'   => 'Status gewijzigd',
+        'attentie'           => 'Attentiesignaal gegeven',
+    ];
+}
+
+/**
+ * Verstuurt 1 webhook (POST met JSON-body) en werkt de laatst-bekende
+ * status van die webhook bij. Gebruikt file_get_contents met een
+ * stream-context (geen curl-extensie nodig). Faalt altijd stil naar de
+ * aanroeper toe -- een kapotte externe koppeling mag nooit de rest van
+ * de applicatie breken.
+ */
+function verstuur_1_webhook(PDO $pdo, array $webhook, string $event, array $payload_data): bool
+{
+    $body = json_encode([
+        'event'    => $event,
+        'tijdstip' => date('c'),
+        'data'     => $payload_data,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $status = 'ok';
+    $foutmelding = null;
+
+    $context = stream_context_create([
+        'http' => [
+            'method'        => 'POST',
+            'header'        => "Content-Type: application/json\r\n",
+            'content'       => $body,
+            'timeout'       => 5,
+            'ignore_errors' => true,
+        ],
+    ]);
+
+    $http_response_header = null; // wordt door file_get_contents gevuld
+    $resultaat = @file_get_contents($webhook['url'], false, $context);
+
+    if ($resultaat === false) {
+        $status = 'fout';
+        $fout = error_get_last();
+        $foutmelding = $fout['message'] ?? 'Kon geen verbinding maken met de URL.';
+    } elseif (isset($http_response_header[0]) && preg_match('#HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m)) {
+        $code = (int) $m[1];
+        if ($code < 200 || $code >= 300) {
+            $status = 'fout';
+            $foutmelding = 'De ontvanger antwoordde met HTTP ' . $code . '.';
+        }
+    }
+
+    $stmt = $pdo->prepare(
+        'UPDATE webhooks SET laatst_verzonden_op = NOW(), laatste_status = :s, laatste_foutmelding = :f WHERE id = :id'
+    );
+    $stmt->execute([
+        's'  => $status,
+        'f'  => $foutmelding ? mb_substr($foutmelding, 0, 250) : null,
+        'id' => $webhook['id'],
+    ]);
+
+    return $status === 'ok';
+}
+
+/**
+ * Verstuurt een gebeurtenis naar alle actieve webhooks die daarop
+ * geabonneerd zijn. Aanroepen op het moment dat het echt gebeurt (bv. na
+ * het aanmaken van een melding); faalt altijd stil, breekt dus nooit de
+ * hoofdactie waar dit bij hoort.
+ */
+function verstuur_webhooks(PDO $pdo, string $event, array $payload_data): void
+{
+    try {
+        $webhooks = $pdo->query('SELECT * FROM webhooks WHERE actief = 1')->fetchAll();
+    } catch (Throwable $e) {
+        return;
+    }
+    foreach ($webhooks as $webhook) {
+        $events = json_decode($webhook['events'], true);
+        if (!is_array($events) || !in_array($event, $events, true)) {
+            continue;
+        }
+        try {
+            verstuur_1_webhook($pdo, $webhook, $event, $payload_data);
+        } catch (Throwable $e) {
+            // Nooit laten crashen op een kapotte externe koppeling.
+        }
+    }
+}
+
 function get_crew(PDO $pdo): array
 {
     return $pdo->query('SELECT * FROM crew ORDER BY naam ASC')->fetchAll();

@@ -84,7 +84,8 @@ $MAX_RESULTATEN = 150;
 $sql = "SELECT m.*,
                h.naam AS hoofd_naam, h.kleur AS hoofd_kleur,
                s.naam AS sub_naam,
-               g.naam AS aangemaakt_door_naam
+               g.naam AS aangemaakt_door_naam,
+               EXISTS(SELECT 1 FROM melding_koppelingen k WHERE k.melding_id = m.id OR k.gekoppelde_melding_id = m.id) AS heeft_koppeling
         FROM meldingen m
         LEFT JOIN hoofdclassificaties h ON h.id = m.hoofdclassificatie_id
         LEFT JOIN subclassificaties s ON s.id = m.subclassificatie_id
@@ -251,7 +252,7 @@ include __DIR__ . '/includes/header.php';
                 <span class="export-checkbox-wrap" onclick="event.stopPropagation()">
                     <input type="checkbox" name="ids[]" value="<?= (int) $m['id'] ?>" class="export-checkbox">
                 </span>
-                <span class="melding-id"><?= $m['attentie'] ? '⚠️ ' : '' ?><?= e($m['meld_id']) ?></span>
+                <span class="melding-id"><?= $m['attentie'] ? '⚠️ ' : '' ?><?= $m['heeft_koppeling'] ? '🔗 ' : '' ?><?= e($m['meld_id']) ?></span>
             </span>
             <span class="melding-main">
                 <span class="titel"><?= e($m['titel']) ?></span>

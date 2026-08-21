@@ -69,6 +69,12 @@ $onderdelen = [
         'link' => '/admin/backup.php',
         'aantal' => null,
     ],
+    [
+        'titel' => 'Connectiviteit',
+        'omschrijving' => 'Uitgaande webhooks naar externe applicaties bij nieuwe meldingen, statuswijzigingen en attentiesignalen.',
+        'link' => '/admin/connectiviteit.php',
+        'aantal' => null,
+    ],
 ];
 ?>
 

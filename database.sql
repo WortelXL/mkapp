@@ -22,10 +22,11 @@ CREATE TABLE IF NOT EXISTS versies (
     versienummer VARCHAR(20) NOT NULL,
     datum VARCHAR(50) NOT NULL,
     wijzigingen TEXT NOT NULL,
-    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY versienummer_uniek (versienummer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO versies (versienummer, datum, wijzigingen) VALUES
+INSERT IGNORE INTO versies (versienummer, datum, wijzigingen) VALUES
 ('V1.3.5', '12 augustus 2026', '## Meldingen & werkproces
 - Meldingen aanmaken met automatisch gegenereerd meld-ID (bv. MK-D2-014), classificatie, prioriteit en locatie.
 - Titel wordt automatisch samengesteld uit de classificatie.
@@ -66,7 +67,18 @@ INSERT INTO versies (versienummer, datum, wijzigingen) VALUES
 ('V1.3.8', '12 augustus 2026', '## Nieuw
 - Backup & Restore onder Beheer: crew, classificaties, statussen, protocollen, locaties en labels exporteren als .json-bestand, met aanvinkvakjes voor wat je wel/niet meeneemt.
 - Bestand weer importeren om dezelfde configuratie snel bij een nieuw evenement te herstellen, zonder alles opnieuw in te vullen.
-- Classificaties, statussen, locaties en labels worden bij import herkend op naam en overgeslagen als ze al bestaan (dus veilig om dezelfde backup meerdere keren te importeren). Protocollen en crew worden altijd als nieuw toegevoegd.');
+- Classificaties, statussen, locaties en labels worden bij import herkend op naam en overgeslagen als ze al bestaan (dus veilig om dezelfde backup meerdere keren te importeren). Protocollen en crew worden altijd als nieuw toegevoegd.'),
+('V1.3.9', '12 augustus 2026', '## Nieuw
+- Connectiviteit onder Beheer: uitgaande webhooks naar externe applicaties (bv. Slack, Teams, een eigen systeem).
+- Webhook afgaan op zelf gekozen gebeurtenissen: nieuwe melding aangemaakt, status gewijzigd, en/of attentiesignaal gegeven.
+- Testknop per webhook om de koppeling meteen te controleren, met status en laatste foutmelding zichtbaar in het overzicht.'),
+('V1.4.0', '13 augustus 2026', '## Nieuw
+- Gekoppelde meldingen: meldingen aan elkaar koppelen (bv. een EHBO-inzet die een AMBU-inzet oplevert), meerdere tegelijk mogelijk.
+- Koppeling met type: "is vervolg van" of "is gerelateerd aan" — op de andere melding zie je automatisch het passende omgekeerde label.
+- Sneltoets "+ Vervolgmelding aanmaken": opent het aanmaakformulier met locatie al ingevuld en koppelt automatisch terug naar de melding waar je vandaan kwam.
+- 🔗-icoon voor het meld-ID op dashboard, Overview en archief zodra een melding ergens aan gekoppeld is.
+- Gekoppelde meldingen blijven zelfstandig (eigen status, protocol, logboek, doorlooptijden) — koppelen beïnvloedt elkaars status niet.
+- Nieuwe pagina "Samengevoegd" (naast Dashboard) met alle koppelingen waar minstens 1 melding nog actief is, met direct kunnen loskoppelen.');
 
 -- Statussen van een melding. De 4 ingebouwde (open/in_behandeling/
 -- afgehandeld/geannuleerd) zijn niet verwijderbaar (anders raken bestaande
@@ -103,6 +115,22 @@ CREATE TABLE IF NOT EXISTS gebruikers (
     api_token VARCHAR(64) DEFAULT NULL UNIQUE,
     auto_refresh_seconden INT NOT NULL DEFAULT 20,
     geluid_nieuwe_melding TINYINT(1) NOT NULL DEFAULT 1,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Uitgaande webhooks: stuurt een JSON-melding (POST) naar een externe URL
+-- bij gekozen gebeurtenissen (nieuwe melding, statuswijziging,
+-- attentiesignaal). "events" is een JSON-array met de gekozen
+-- gebeurtenis-sleutels, bv. ["melding_aangemaakt","attentie"].
+CREATE TABLE IF NOT EXISTS webhooks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    naam VARCHAR(100) NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    events TEXT NOT NULL,
+    actief TINYINT(1) NOT NULL DEFAULT 1,
+    laatst_verzonden_op DATETIME DEFAULT NULL,
+    laatste_status VARCHAR(20) DEFAULT NULL,
+    laatste_foutmelding VARCHAR(255) DEFAULT NULL,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -283,6 +311,26 @@ CREATE TABLE IF NOT EXISTS melding_status_log (
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
     FOREIGN KEY (gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Koppelt meldingen aan elkaar (bv. een EHBO-inzet die een AMBU-inzet
+-- oplevert). Blijven allebei zelfstandige meldingen (eigen status,
+-- protocol, logboek) -- dit is puur een zichtbare, getypeerde relatie.
+-- "type" is gericht: melding_id [type] gekoppelde_melding_id, bv.
+-- "melding_id is vervolg van gekoppelde_melding_id". Bij weergave op de
+-- andere melding wordt het omgekeerde label getoond (zie
+-- koppeling_types() in functions.php).
+CREATE TABLE IF NOT EXISTS melding_koppelingen (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    melding_id INT NOT NULL,
+    gekoppelde_melding_id INT NOT NULL,
+    type VARCHAR(30) NOT NULL DEFAULT 'gerelateerd',
+    aangemaakt_door_id INT DEFAULT NULL,
+    aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
+    FOREIGN KEY (gekoppelde_melding_id) REFERENCES meldingen(id) ON DELETE CASCADE,
+    FOREIGN KEY (aangemaakt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
+    UNIQUE KEY unieke_koppeling (melding_id, gekoppelde_melding_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Losse taken: een eenvoudig to-do-lijstje per melding, los van elk

@@ -29,20 +29,29 @@ $status     = $_POST['status'] ?? '';
 $terug      = veilig_terug_pad($_POST['terug'] ?? '/index.php');
 
 if ($melding_id > 0 && is_geldige_status($pdo, $status)) {
-    $huidige_stmt = $pdo->prepare('SELECT status FROM meldingen WHERE id = :id');
+    $huidige_stmt = $pdo->prepare('SELECT status, meld_id, titel FROM meldingen WHERE id = :id');
     $huidige_stmt->execute(['id' => $melding_id]);
-    $huidige_status = $huidige_stmt->fetchColumn();
+    $huidige_melding = $huidige_stmt->fetch();
 
-    $stmt = $pdo->prepare(
-        'UPDATE meldingen SET status = :status, bijgewerkt_door_id = :gebruiker WHERE id = :id'
-    );
-    $stmt->execute([
-        'status'    => $status,
-        'gebruiker' => $_SESSION['gebruiker_id'],
-        'id'        => $melding_id,
-    ]);
-    if ($huidige_status !== false && $status !== $huidige_status) {
-        log_status($pdo, $melding_id, $status, $_SESSION['gebruiker_id']);
+    if ($huidige_melding) {
+        $stmt = $pdo->prepare(
+            'UPDATE meldingen SET status = :status, bijgewerkt_door_id = :gebruiker WHERE id = :id'
+        );
+        $stmt->execute([
+            'status'    => $status,
+            'gebruiker' => $_SESSION['gebruiker_id'],
+            'id'        => $melding_id,
+        ]);
+        if ($status !== $huidige_melding['status']) {
+            log_status($pdo, $melding_id, $status, $_SESSION['gebruiker_id']);
+            verstuur_webhooks($pdo, 'status_gewijzigd', [
+                'id' => $melding_id,
+                'meld_id' => $huidige_melding['meld_id'],
+                'titel' => $huidige_melding['titel'],
+                'oude_status' => $huidige_melding['status'],
+                'nieuwe_status' => $status,
+            ]);
+        }
     }
 }
 
