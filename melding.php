@@ -87,6 +87,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($actie === 'attentie_wisselen') {
+        $nieuw = $melding['attentie'] ? 0 : 1;
+        $stmt = $pdo->prepare(
+            'UPDATE meldingen SET attentie = :a, attentie_door_id = :g, attentie_op = :t WHERE id = :id'
+        );
+        $stmt->execute([
+            'a' => $nieuw,
+            'g' => $nieuw ? $_SESSION['gebruiker_id'] : null,
+            't' => $nieuw ? date('Y-m-d H:i:s') : null,
+            'id' => $id,
+        ]);
+        header('Location: /melding.php?id=' . $id);
+        exit;
+    }
+
     if ($actie === 'protocol_koppelen') {
         $protocol_id = (int) ($_POST['protocol_id'] ?? 0);
         if ($protocol_id > 0) {
@@ -280,12 +295,18 @@ include __DIR__ . '/includes/header.php';
 
 <div class="detail-head">
     <div>
-        <p class="eyebrow"><?= e($melding['meld_id']) ?></p>
+        <p class="eyebrow"><?= $melding['attentie'] ? '⚠️ ' : '' ?><?= e($melding['meld_id']) ?></p>
         <h1><?= e($melding['titel']) ?></h1>
     </div>
-    <div style="display:flex; gap:8px;">
+    <div style="display:flex; gap:8px; align-items:center;">
         <span class="tag <?= prioriteit_class($melding['prioriteit']) ?>"><?= prioriteit_label($melding['prioriteit']) ?></span>
         <?= status_tag_html($melding['status']) ?>
+        <form method="post" style="margin:0;">
+            <input type="hidden" name="actie" value="attentie_wisselen">
+            <button type="submit" class="btn btn-small <?= $melding['attentie'] ? 'btn-danger' : '' ?>" title="<?= $melding['attentie'] ? 'Attentiesignaal wegnemen' : 'Attentiesignaal geven — geeft een geluidssignaal en ⚠️ op alle overzichten' ?>">
+                <?= $melding['attentie'] ? '✓ Attentie wegnemen' : '⚠️ Attentie geven' ?>
+            </button>
+        </form>
     </div>
 </div>
 

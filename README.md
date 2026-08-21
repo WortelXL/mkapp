@@ -345,6 +345,41 @@ gevonden locatie. Exacte namen gaan voor; is er geen exacte match, dan
 wordt een gedeeltelijke match gebruikt. Matcht niets, dan gebeurt er
 stilzwijgend niets (de tekst zelf blijft gewoon staan zoals getypt).
 
+## Backup & Restore
+
+Beheer &rarr; Backup & Restore (`/admin/backup.php`) exporteert de
+basisinstellingen van je meldkamer als één .json-bestand — met
+aanvinkvakjes om te kiezen wat je meeneemt: crew, classificaties (hoofd +
+sub), statussen (je eigen, niet de 4 ingebouwde), protocollen (incl.
+subtaken en naslaglinks), locaties en labels. Meldingen, gebruikers en
+API-tokens zitten hier bewust niet bij.
+
+Datzelfde bestand kun je later weer importeren — handig om snel een
+nieuw evenement met dezelfde configuratie op te zetten, of als
+reservekopie. Classificaties, statussen, locaties en labels worden bij
+import herkend op naam: bestaat iets al, dan wordt het overgeslagen, dus
+je kunt dezelfde backup gerust meerdere keren importeren zonder
+duplicaten. Protocollen en crew worden altijd als nieuw toegevoegd (die
+hebben geen unieke naam om op te herkennen), dus daar kan herhaald
+importeren wel dubbele invoer opleveren.
+
+## Attentiesignaal
+
+Op de melddetailpagina, naast de status, staat een knop **"⚠️ Attentie
+geven"**. Bedoeld om nadrukkelijk de aandacht op een specifieke melding te
+vestigen — bijvoorbeeld als iemand er nu echt naar moet kijken. Zodra dit
+aan staat:
+
+- Verschijnt ⚠️ vóór het meld-ID op het dashboard, Overview en het
+  archief, totdat iemand op de knop klikt om het weer uit te zetten
+  ("✓ Attentie wegnemen").
+- Klinkt er, net als bij een nieuwe melding, een geluidssignaal bij
+  iedereen die het dashboard of Overview open heeft staan — maar dan een
+  duidelijk ander geluid (dezelfde toon, twee keer, als een belletje) zodat
+  je meteen hoort dat het om een attentiesignaal gaat en niet om een nieuwe
+  melding. Gebruikt dezelfde persoonlijke aan/uit-instelling voor geluid
+  als de rest van de app (`/profiel.php`).
+
 ## Losse taken
 
 Naast subtaken die bij een protocol horen, kan een melding ook eigen,

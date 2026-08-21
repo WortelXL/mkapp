@@ -63,6 +63,12 @@ $onderdelen = [
         'link' => '/admin/instellingen.php',
         'aantal' => null,
     ],
+    [
+        'titel' => 'Backup & Restore',
+        'omschrijving' => 'Basisinstellingen (crew, classificaties, statussen, protocollen, locaties, labels) exporteren of importeren.',
+        'link' => '/admin/backup.php',
+        'aantal' => null,
+    ],
 ];
 ?>
 

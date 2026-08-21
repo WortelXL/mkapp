@@ -251,7 +251,7 @@ include __DIR__ . '/includes/header.php';
                 <span class="export-checkbox-wrap" onclick="event.stopPropagation()">
                     <input type="checkbox" name="ids[]" value="<?= (int) $m['id'] ?>" class="export-checkbox">
                 </span>
-                <span class="melding-id"><?= e($m['meld_id']) ?></span>
+                <span class="melding-id"><?= $m['attentie'] ? '⚠️ ' : '' ?><?= e($m['meld_id']) ?></span>
             </span>
             <span class="melding-main">
                 <span class="titel"><?= e($m['titel']) ?></span>

@@ -164,8 +164,21 @@ if ($actieve_sleutels) {
     );
     $hoogste_stmt->execute($hoogste_params);
     $globale_hoogste_id = (int) $hoogste_stmt->fetchColumn();
+
+    $attentie_placeholders = [];
+    $attentie_params = [];
+    foreach ($actieve_sleutels as $i => $sleutel) {
+        $attentie_placeholders[] = ':ats' . $i;
+        $attentie_params['ats' . $i] = $sleutel;
+    }
+    $attentie_stmt = $pdo->prepare(
+        'SELECT COALESCE(MAX(id), 0) FROM meldingen WHERE attentie = 1 AND status IN (' . implode(',', $attentie_placeholders) . ')'
+    );
+    $attentie_stmt->execute($attentie_params);
+    $hoogste_attentie_id = (int) $attentie_stmt->fetchColumn();
 } else {
     $globale_hoogste_id = 0;
+    $hoogste_attentie_id = 0;
 }
 
 $mijn_instellingen = huidige_gebruiker_instellingen($pdo);
@@ -274,7 +287,7 @@ include __DIR__ . '/includes/header.php';
 
     <?php foreach ($meldingen as $m): ?>
         <div class="melding-row prio-<?= e($m['prioriteit']) ?>" onclick="if (!event.target.closest('.status-form')) { window.location = '/melding.php?id=<?= (int) $m['id'] ?>'; }">
-            <span class="melding-id"><?= e($m['meld_id']) ?></span>
+            <span class="melding-id"><?= $m['attentie'] ? '⚠️ ' : '' ?><?= e($m['meld_id']) ?></span>
             <span class="melding-main">
                 <span class="titel"><?= e($m['titel']) ?></span>
                 <span class="meta">
@@ -322,7 +335,9 @@ include __DIR__ . '/includes/header.php';
     const ververs_seconden = <?= (int) $mijn_instellingen['auto_refresh_seconden'] ?>;
     const geluid_aan = <?= $mijn_instellingen['geluid_nieuwe_melding'] ? 'true' : 'false' ?>;
     const globale_hoogste_id = <?= $globale_hoogste_id ?>;
+    const hoogste_attentie_id = <?= $hoogste_attentie_id ?>;
     const OPSLAG_SLEUTEL = 'meldkamer_laatste_gezien_id';
+    const OPSLAG_SLEUTEL_ATTENTIE = 'meldkamer_laatste_gezien_attentie_id';
 
     let zoekveld_actief = false;
     const zoekveld = document.querySelector('.filters input[name="q"]');
@@ -354,13 +369,42 @@ include __DIR__ . '/includes/header.php';
         }
     }
 
+    // Attentiesignaal: één toon, twee keer (belletje) -- bewust anders dan
+    // het "nieuwe melding"-geluid hierboven, zodat je meteen het verschil
+    // hoort.
+    function speel_attentiegeluid() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            [0, 0.35].forEach(function (vertraging) {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 1046; // C6, klinkt als een belletje
+                gain.gain.setValueAtTime(0.001, ctx.currentTime + vertraging);
+                gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + vertraging + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + vertraging + 0.5);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(ctx.currentTime + vertraging);
+                osc.stop(ctx.currentTime + vertraging + 0.55);
+            });
+        } catch (e) {
+            // Geluid kan geblokkeerd zijn door de browser, negeer dan stil.
+        }
+    }
+
     if (geluid_aan) {
         const opgeslagen = localStorage.getItem(OPSLAG_SLEUTEL);
         if (opgeslagen !== null && globale_hoogste_id > parseInt(opgeslagen, 10)) {
             speel_meldingsgeluid();
         }
+
+        const opgeslagen_attentie = localStorage.getItem(OPSLAG_SLEUTEL_ATTENTIE);
+        if (opgeslagen_attentie !== null && hoogste_attentie_id > parseInt(opgeslagen_attentie, 10)) {
+            speel_attentiegeluid();
+        }
     }
     localStorage.setItem(OPSLAG_SLEUTEL, String(globale_hoogste_id));
+    localStorage.setItem(OPSLAG_SLEUTEL_ATTENTIE, String(hoogste_attentie_id));
 
     if (ververs_seconden > 0) {
         setInterval(function () {

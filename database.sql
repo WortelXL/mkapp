@@ -58,7 +58,15 @@ INSERT INTO versies (versienummer, datum, wijzigingen) VALUES
 ## Reparaties
 - Databasecontainer draaide op UTC in plaats van Europe/Amsterdam, waardoor tijdstippen 1-2 uur konden afwijken.
 - Archief-tellingen en -leegmaken gebruikten nog een vaste statuslijst van vóór de eigen-statussen-functie, werkten daardoor niet correct met een zelf toegevoegde afgeronde status.
-- SQL-fout op de Overview-pagina door een ontbrekende tabel-alias.');
+- SQL-fout op de Overview-pagina door een ontbrekende tabel-alias.'),
+('V1.3.7', '12 augustus 2026', '## Nieuw
+- Attentiesignaal: knop op de melddetailpagina om nadrukkelijk de aandacht te vragen voor een melding.
+- Bij een attentiesignaal verschijnt ⚠️ voor het meld-ID op dashboard, Overview en archief, tot iemand het weer uitzet.
+- Eigen belgeluid voor een attentiesignaal (dezelfde toon, twee keer), duidelijk anders dan het geluid bij een nieuwe melding.'),
+('V1.3.8', '12 augustus 2026', '## Nieuw
+- Backup & Restore onder Beheer: crew, classificaties, statussen, protocollen, locaties en labels exporteren als .json-bestand, met aanvinkvakjes voor wat je wel/niet meeneemt.
+- Bestand weer importeren om dezelfde configuratie snel bij een nieuw evenement te herstellen, zonder alles opnieuw in te vullen.
+- Classificaties, statussen, locaties en labels worden bij import herkend op naam en overgeslagen als ze al bestaan (dus veilig om dezelfde backup meerdere keren te importeren). Protocollen en crew worden altijd als nieuw toegevoegd.');
 
 -- Statussen van een melding. De 4 ingebouwde (open/in_behandeling/
 -- afgehandeld/geannuleerd) zijn niet verwijderbaar (anders raken bestaande
@@ -204,6 +212,9 @@ CREATE TABLE IF NOT EXISTS meldingen (
     toegewezen_aan_gebruiker_id INT DEFAULT NULL,
     toegewezen_aan_crew_id INT DEFAULT NULL,
     toegewezen_centralist_id INT DEFAULT NULL,
+    attentie TINYINT(1) NOT NULL DEFAULT 0,
+    attentie_door_id INT DEFAULT NULL,
+    attentie_op DATETIME DEFAULT NULL,
     aangemaakt_door_id INT DEFAULT NULL,
     bijgewerkt_door_id INT DEFAULT NULL,
     aangemaakt_op DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -214,7 +225,8 @@ CREATE TABLE IF NOT EXISTS meldingen (
     FOREIGN KEY (bijgewerkt_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
     FOREIGN KEY (toegewezen_aan_gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
     FOREIGN KEY (toegewezen_aan_crew_id) REFERENCES crew(id) ON DELETE SET NULL,
-    FOREIGN KEY (toegewezen_centralist_id) REFERENCES gebruikers(id) ON DELETE SET NULL
+    FOREIGN KEY (toegewezen_centralist_id) REFERENCES gebruikers(id) ON DELETE SET NULL,
+    FOREIGN KEY (attentie_door_id) REFERENCES gebruikers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS melding_protocollen (
